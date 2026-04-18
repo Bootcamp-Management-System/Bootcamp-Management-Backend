@@ -7,7 +7,8 @@ const router = express.Router();
 router.use(protect);
 
 router.route("/")
-  .post(restrictTo("admin"), createDivision)
-  .get(getDivisions);
+  .post(restrictTo("super-admin"), createDivision)
+  .get(restrictTo("super-admin", "admin"), getDivisions);
+
 
 export default router;

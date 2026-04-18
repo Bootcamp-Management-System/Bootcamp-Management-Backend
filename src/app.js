@@ -11,7 +11,7 @@ import divisionRoutes from "./routes/division.js";
 import sessionRoutes from "./routes/session.js";
 import attendanceRoutes from "./routes/attendance.js";
 
-dotenv.config();
+dotenv.config({ path: "src/config/.env" });
 
 connectDB();
 

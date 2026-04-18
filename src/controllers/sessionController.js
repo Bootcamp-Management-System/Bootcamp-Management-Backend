@@ -20,16 +20,27 @@ export const createSession = async (req, res) => {
     if (!divisionExists) return res.status(404).json({ error: "Division not found" });
 
     const instructorExists = await User.findById(instructor);
-    if (!instructorExists || instructorExists.role !== "admin") {
-      return res.status(400).json({ error: "Invalid admin ID" });
+    if (!instructorExists || !['admin', 'instructor'].includes(instructorExists.role)) {
+      return res.status(400).json({ error: "Invalid instructor/admin ID" });
     }
 
-    const isAdminAssigned = divisionExists.instructors
-      .map((id) => id.toString())
-      .includes(instructor.toString());
-    if (!isAdminAssigned) {
-      return res.status(400).json({ error: "Admin is not assigned to this division" });
+    // Check if the instructor/admin belongs to the division (except maybe super admin?)
+    // But Super Admin wouldn't usually be assigned as a session instructor directly in this simplified logic
+    if (instructorExists.role === 'admin' && instructorExists.division.toString() !== division.toString()) {
+       return res.status(400).json({ error: "Admin does not belong to this division" });
     }
+    
+    // For instructors, we should also check if they are part of the division
+    // Assuming Division model has an instructors array
+    if (instructorExists.role === 'instructor') {
+      const isAssignedToDivision = divisionExists.instructors
+        .map((id) => id.toString())
+        .includes(instructor.toString());
+      if (!isAssignedToDivision) {
+        return res.status(400).json({ error: "Instructor is not assigned to this division" });
+      }
+    }
+
 
     const conflictQuery = {
       $or: [
@@ -64,11 +75,23 @@ export const createSession = async (req, res) => {
 
 export const getSessions = async (req, res) => {
   try {
-    const sessions = await Session.find()
+    const filter = {};
+    
+    // Admin is restricted by division (middleware injects this into query)
+    if (req.query.division) {
+      filter.division = req.query.division;
+    }
+
+    // Instructor only sees their assigned sessions
+    if (req.user.role === 'instructor') {
+      filter.instructor = req.user._id;
+    }
+
+    const sessions = await Session.find(filter)
       .populate("instructor", "email role")
       .populate("division", "name");
     res.status(200).json({ success: true, count: sessions.length, data: sessions });
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
-};
+};

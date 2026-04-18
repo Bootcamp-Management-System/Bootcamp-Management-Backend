@@ -34,9 +34,15 @@ export const createDivision = async (req, res) => {
 
 export const getDivisions = async (req, res) => {
   try {
-    const divisions = await Division.find().populate("instructors", "email role");
+    const filter = {};
+
+    if (req.user.role === 'admin') {
+      filter._id = req.user.division;
+    }
+
+    const divisions = await Division.find(filter).populate("instructors", "email role");
     res.status(200).json({ success: true, count: divisions.length, data: divisions });
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
-};
+};

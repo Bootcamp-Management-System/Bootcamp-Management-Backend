@@ -21,17 +21,17 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    if (user.firstLogin) {
+    if (user.firstLogin || !user.verified) {
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       user.otp = { code: otpCode, expiresAt: Date.now() + 10 * 60 * 1000 };
       await user.save();
       
       await sendEmail({ 
         to: user.email, 
-        subject: "Verification OTP", 
-        text: `Your OTP is ${otpCode}. It expires in 10 minutes.` 
+        subject: "Account Verification Required", 
+        text: `Welcome back. Please verify your account to continue. Your OTP is ${otpCode}. It expires in 10 minutes.` 
       });
-      return res.status(200).json({ message: "First login detected. OTP sent to email." });
+      return res.status(200).json({ message: "Verification required. OTP sent to email." });
     }
 
     const token = generateToken(user._id);

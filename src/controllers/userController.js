@@ -2,13 +2,106 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import User from "../models/User.js";
 import sendEmail from "../services/emailService.js";
+import Division from "../models/Division.js";
 
 // @desc    Create new user (Admin only)
 // @route   POST /api/v1/users
 // @access  Private/Admin
+// @desc    Get all users (Admin/Super Admin only)
+export const getUsers = async (req, res) => {
+  try {
+    const filter = {};
+    
+    // Admin is restricted to their division
+    if (req.user.role === 'admin') {
+      filter.division = req.user.division;
+    }
+
+    const users = await User.find(filter).select("-password").populate("division", "name");
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// @desc    Promote a user
+export const promoteUser = async (req, res) => {
+  try {
+    const { userId, newRole, divisionId } = req.body;
+    const adminUser = req.user;
+
+    const userToPromote = await User.findById(userId);
+    if (!userToPromote) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // RBAC Logic for Promotion
+    if (adminUser.role === 'super-admin') {
+      // Super admin can do anything
+      userToPromote.role = newRole || userToPromote.role;
+      if (divisionId) userToPromote.division = divisionId;
+    } else if (adminUser.role === 'admin') {
+      if (newRole !== 'instructor') {
+         return res.status(403).json({ message: "Admins can only promote students to instructors" });
+      }
+      if (userToPromote.role !== 'student') {
+         return res.status(400).json({ message: "Only students can be promoted by admins" });
+      }
+      if (userToPromote.division.toString() !== adminUser.division.toString()) {
+         return res.status(403).json({ message: "You can only promote students within your own division" });
+      }
+      // 🔥 NEW: Check if the student is verified
+      if (!userToPromote.verified) {
+         return res.status(403).json({ message: "Student must verify their email before they can be promoted" });
+      }
+      userToPromote.role = 'instructor';
+    } else {
+      return res.status(403).json({ message: "Insufficient permissions to promote users" });
+    }
+
+    await userToPromote.save();
+
+    // If promoted to instructor, add to the Division instructors array
+    if (userToPromote.role === 'instructor') {
+      await Division.findByIdAndUpdate(userToPromote.division, {
+        $addToSet: { instructors: userToPromote._id }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `User promoted to ${userToPromote.role} and added to division records`,
+      data: userToPromote
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// @desc    Create new user
 export const createUser = async (req, res) => {
   try {
     const { email, role, division } = req.body;
+    const creator = req.user;
+
+    // 1. Email Format Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // RBAC check for user creation
+    if (creator.role === 'admin') {
+       if (role && role !== 'student') {
+          return res.status(403).json({ message: "Admins can only create students" });
+       }
+       // Ensure student is created in admin's division
+       req.body.division = creator.division;
+    }
 
     // 1. Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -16,7 +109,7 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ message: "User already exists with this email" });
     }
 
-    // 2. Generate a random temporary password (e.g., 8 bytes hex = 16 characters)
+    // 2. Generate a random temporary password
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
@@ -24,20 +117,12 @@ export const createUser = async (req, res) => {
     const user = await User.create({
       email,
       password: hashedPassword,
-      role: role || "student", // default to student if not provided
-      division: division || undefined,
-      firstLogin: true, // As per your requirements
+      role: role || "student",
+      division: req.body.division || undefined,
+      firstLogin: true,
       verified: false
     });
 
-    // 4. Send email with credentials (commented out actual send for local testing speed, but it's ready)
-    // await sendEmail({
-    //   to: email,
-    //   subject: "Welcome to BMS - Your Login Credentials",
-    //   text: `Your account has been created.\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease login to verify your account and change your password.`
-    // });
-
-    // 5. Send response (Returning tempPassword here so you can easily test in Postman!)
     res.status(201).json({
       success: true,
       message: "User created successfully",
@@ -46,25 +131,9 @@ export const createUser = async (req, res) => {
         email: user.email,
         role: user.role
       },
-      tempPassword // ⚠️ REMOVE THIS IN PRODUCTION - Only here for testing purposes so you don't have to check emails
+      tempPassword
     });
 
-  } catch (error) {
-    res.status(500).json({ message: "Server Error", error: error.message });
-  }
-};
-
-// @desc    Get all users (Admin only)
-// @route   GET /api/v1/users
-// @access  Private/Admin
-export const getUsers = async (req, res) => {
-  try {
-    const users = await User.find().select("-password");
-    res.status(200).json({
-      success: true,
-      count: users.length,
-      data: users
-    });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
