@@ -1,8 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+// import helmet from "helmet";
+// import rateLimit from "express-rate-limit";
 import connectDB from "./config/db.js";
 
 import authRoutes from "./routes/auth.js";
@@ -18,7 +18,7 @@ connectDB();
 
 const app = express();
 
-app.use(helmet());
+// app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
@@ -26,13 +26,13 @@ app.use(express.json());
 import path from "path";
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: "Too many login attempts, please try again after 15 minutes",
-});
+// const loginLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 5,
+//   message: "Too many login attempts, please try again after 15 minutes",
+// });
 
-app.use("/api/v1/auth/login", loginLimiter);
+
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/divisions", divisionRoutes);
