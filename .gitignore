@@ -19,11 +19,4 @@ Thumbs.db
 # Build folders
 dist/
 build/
-<<<<<<< HEAD
-uploads/
-=======
-uploads/
-attendanceController.js
-attendance.js
-Attendance.js
->>>>>>> c81a4a1 (feat: Implement core functionality for divisions, resources, sessions, and users)
+
