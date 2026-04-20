@@ -49,7 +49,16 @@ export const markAttendance = async (req, res) => {
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: "Session not found" });
 
-    // Permissions check
+    // 2. Window Check: Only allow marking/editing within 24 hours of session end
+    const now = new Date();
+    const sessionEnd = new Date(session.endTime);
+    const limit = 24 * 60 * 60 * 1000; // 24 hours in MS
+
+    if (now - sessionEnd > limit) {
+      return res.status(400).json({ error: "The 24-hour window for marking attendance for this session has closed." });
+    }
+
+    // 3. Permissions check
     if (marker.role === 'admin') {
       if (session.division.toString() !== marker.division.toString()) {
         return res.status(403).json({ error: "You can only mark attendance for sessions in your division" });

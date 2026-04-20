@@ -10,6 +10,9 @@ import userRoutes from "./routes/user.js";
 import divisionRoutes from "./routes/division.js";
 import sessionRoutes from "./routes/session.js";
 import attendanceRoutes from "./routes/attendance.js";
+import taskRoutes from "./routes/task.js";
+import submissionRoutes from "./routes/submission.js";
+import feedbackRoutes from "./routes/feedback.js";
 
 dotenv.config({ path: "src/config/.env" });
 
@@ -33,6 +36,10 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/divisions", divisionRoutes);
 app.use("/api/v1/sessions", sessionRoutes);
 app.use("/api/v1/attendance", attendanceRoutes);
+app.use("/api/v1/tasks", taskRoutes);
+app.use("/api/v1/submissions", submissionRoutes);
+app.use("/api/v1/feedback", feedbackRoutes);
+
 
 app.get("/", (req, res) => {
   res.send("Bootcamp Management Backend Running 🚀");

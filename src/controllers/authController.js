@@ -1,21 +1,25 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import sendEmail from "../services/emailService.js";
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_ACCESS_SECRET, { expiresIn: process.env.JWT_ACCESS_EXPIRES || "15m" });
+  return jwt.sign({ id }, process.env.JWT_ACCESS_SECRET, {
+    expiresIn: process.env.JWT_ACCESS_EXPIRES || "15m",
+  });
 };
 
 const generateRefreshToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES || "7d" });
+  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRES || "7d",
+  });
 };
 
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     const user = await User.findOne({ email });
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -25,13 +29,15 @@ export const loginUser = async (req, res) => {
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       user.otp = { code: otpCode, expiresAt: Date.now() + 10 * 60 * 1000 };
       await user.save();
-      
-      await sendEmail({ 
-        to: user.email, 
-        subject: "Account Verification Required", 
-        text: `Welcome back. Please verify your account to continue. Your OTP is ${otpCode}. It expires in 10 minutes.` 
+
+      await sendEmail({
+        to: user.email,
+        subject: "Account Verification Required",
+        text: `Welcome back. Please verify your account to continue. Your OTP is ${otpCode}. It expires in 10 minutes.`,
       });
-      return res.status(200).json({ message: "Verification required. OTP sent to email." });
+      return res
+        .status(200)
+        .json({ message: "Verification required. OTP sent to email." });
     }
 
     const token = generateToken(user._id);
@@ -41,7 +47,7 @@ export const loginUser = async (req, res) => {
       success: true,
       token,
       refreshToken,
-      user: { id: user._id, role: user.role, division: user.division }
+      user: { id: user._id, role: user.role, division: user.division },
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -66,7 +72,9 @@ export const verifyOtp = async (req, res) => {
     user.verified = true;
     await user.save();
 
-    res.status(200).json({ message: "Password setup successful. You can now log in." });
+    res
+      .status(200)
+      .json({ message: "Password setup successful. You can now log in." });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -78,10 +86,10 @@ export const googleLogin = async (req, res) => {
     const { googleToken } = req.body;
     // Decode googleToken, extract email and name (mocked here)
     // const decoded = await verifyGoogleToken(googleToken);
-    const email = "google@example.com"; 
+    const email = "google@example.com";
 
     let user = await User.findOne({ email });
-    
+
     if (!user) {
       user = await User.create({
         email,
@@ -99,7 +107,7 @@ export const googleLogin = async (req, res) => {
       success: true,
       token,
       refreshToken,
-      user: { id: user._id, role: user.role, division: user.division }
+      user: { id: user._id, role: user.role, division: user.division },
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });

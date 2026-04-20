@@ -1,8 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import User from "../models/User.js";
-import sendEmail from "../services/emailService.js";
 import Division from "../models/Division.js";
+import User from "../models/User.js";
 
 // @desc    Create new user (Admin only)
 // @route   POST /api/v1/users
@@ -11,17 +10,19 @@ import Division from "../models/Division.js";
 export const getUsers = async (req, res) => {
   try {
     const filter = {};
-    
+
     // Admin is restricted to their division
-    if (req.user.role === 'admin') {
+    if (req.user.role === "admin") {
       filter.division = req.user.division;
     }
 
-    const users = await User.find(filter).select("-password").populate("division", "name");
+    const users = await User.find(filter)
+      .select("-password")
+      .populate("division", "name");
     res.status(200).json({
       success: true,
       count: users.length,
-      data: users
+      data: users,
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -40,42 +41,53 @@ export const promoteUser = async (req, res) => {
     }
 
     // RBAC Logic for Promotion
-    if (adminUser.role === 'super-admin') {
+    if (adminUser.role === "super-admin") {
       // Super admin can do anything
       userToPromote.role = newRole || userToPromote.role;
       if (divisionId) userToPromote.division = divisionId;
-    } else if (adminUser.role === 'admin') {
-      if (newRole !== 'instructor') {
-         return res.status(403).json({ message: "Admins can only promote students to instructors" });
+    } else if (adminUser.role === "admin") {
+      if (newRole !== "instructor") {
+        return res
+          .status(403)
+          .json({ message: "Admins can only promote students to instructors" });
       }
-      if (userToPromote.role !== 'student') {
-         return res.status(400).json({ message: "Only students can be promoted by admins" });
+      if (userToPromote.role !== "student") {
+        return res
+          .status(400)
+          .json({ message: "Only students can be promoted by admins" });
       }
       if (userToPromote.division.toString() !== adminUser.division.toString()) {
-         return res.status(403).json({ message: "You can only promote students within your own division" });
+        return res.status(403).json({
+          message: "You can only promote students within your own division",
+        });
       }
       // 🔥 NEW: Check if the student is verified
       if (!userToPromote.verified) {
-         return res.status(403).json({ message: "Student must verify their email before they can be promoted" });
+        return res.status(403).json({
+          message:
+            "Student must verify their email before they can be promoted",
+        });
       }
-      userToPromote.role = 'instructor';
+      userToPromote.role = "instructor";
     } else {
-      return res.status(403).json({ message: "Insufficient permissions to promote users" });
+      return res
+        .status(403)
+        .json({ message: "Insufficient permissions to promote users" });
     }
 
     await userToPromote.save();
 
     // If promoted to instructor, add to the Division instructors array
-    if (userToPromote.role === 'instructor') {
+    if (userToPromote.role === "instructor") {
       await Division.findByIdAndUpdate(userToPromote.division, {
-        $addToSet: { instructors: userToPromote._id }
+        $addToSet: { instructors: userToPromote._id },
       });
     }
 
     res.status(200).json({
       success: true,
       message: `User promoted to ${userToPromote.role} and added to division records`,
-      data: userToPromote
+      data: userToPromote,
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -95,18 +107,24 @@ export const createUser = async (req, res) => {
     }
 
     // RBAC check for user creation
-    if (creator.role === 'admin') {
-       if (role && role !== 'student') {
-          return res.status(403).json({ message: "Admins can only create students" });
-       }
-       // Ensure student is created in admin's division
-       req.body.division = creator.division;
+    if (creator.role === "admin") {
+      if (role && role !== "student") {
+        return res
+          .status(403)
+          .json({ message: "Admins can only create students" });
+      }
+      // Ensure student is created in admin's division
+      req.body.division = creator.division;
     }
 
-    // 1. Check if user already exists
-    const existingUser = await User.findOne({ email });
+    // 1. Check if user already exists (Case-Insensitive)
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists with this email" });
+      console.log(`[AUTH] Attempted to create duplicate user: ${email}`);
+      return res.status(400).json({
+        success: false,
+        message: "User already exists with this email",
+      });
     }
 
     // 2. Generate a random temporary password
@@ -120,7 +138,7 @@ export const createUser = async (req, res) => {
       role: role || "student",
       division: req.body.division || undefined,
       firstLogin: true,
-      verified: false
+      verified: false,
     });
 
     res.status(201).json({
@@ -129,11 +147,10 @@ export const createUser = async (req, res) => {
       data: {
         id: user._id,
         email: user.email,
-        role: user.role
+        role: user.role,
       },
-      tempPassword
+      tempPassword,
     });
-
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -155,7 +172,7 @@ export const getMe = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: user
+      data: user,
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -174,7 +191,7 @@ export const getUserById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: user
+      data: user,
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
