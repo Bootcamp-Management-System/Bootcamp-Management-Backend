@@ -17,3 +17,7 @@ postman/
 # Scripts
 seed_admin.js
 API_DOCUMENTATION.md
+# Build folders
+dist/
+build/
+

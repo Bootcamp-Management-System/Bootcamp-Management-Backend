@@ -47,7 +47,7 @@ export const loginUser = async (req, res) => {
       success: true,
       token,
       refreshToken,
-      user: { id: user._id, role: user.role, division: user.division },
+      user: { id: user._id, role: user.role, division: user.division }
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -72,9 +72,7 @@ export const verifyOtp = async (req, res) => {
     user.verified = true;
     await user.save();
 
-    res
-      .status(200)
-      .json({ message: "Password setup successful. You can now log in." });
+    res.status(200).json({ message: "Password setup successful. You can now log in." });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -86,10 +84,10 @@ export const googleLogin = async (req, res) => {
     const { googleToken } = req.body;
     // Decode googleToken, extract email and name (mocked here)
     // const decoded = await verifyGoogleToken(googleToken);
-    const email = "google@example.com";
+    const email = "google@example.com"; 
 
     let user = await User.findOne({ email });
-
+    
     if (!user) {
       user = await User.create({
         email,
@@ -107,7 +105,7 @@ export const googleLogin = async (req, res) => {
       success: true,
       token,
       refreshToken,
-      user: { id: user._id, role: user.role, division: user.division },
+      user: { id: user._id, role: user.role, division: user.division }
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });

@@ -1,133 +1,25 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import Division from "../models/Division.js";
 import User from "../models/User.js";
+import Division from "../models/Division.js";
+import RoleHistory from "../models/RoleHistory.js";
+import sendEmail from "../services/emailService.js";
 
 // @desc    Create new user (Admin only)
 // @route   POST /api/v1/users
 // @access  Private/Admin
-// @desc    Get all users (Admin/Super Admin only)
-export const getUsers = async (req, res) => {
-  try {
-    const filter = {};
-
-    // Admin is restricted to their division
-    if (req.user.role === "admin") {
-      filter.division = req.user.division;
-    }
-
-    const users = await User.find(filter)
-      .select("-password")
-      .populate("division", "name");
-    res.status(200).json({
-      success: true,
-      count: users.length,
-      data: users,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server Error", error: error.message });
-  }
-};
-
-// @desc    Promote a user
-export const promoteUser = async (req, res) => {
-  try {
-    const { userId, newRole, divisionId } = req.body;
-    const adminUser = req.user;
-
-    const userToPromote = await User.findById(userId);
-    if (!userToPromote) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // RBAC Logic for Promotion
-    if (adminUser.role === "super-admin") {
-      // Super admin can do anything
-      userToPromote.role = newRole || userToPromote.role;
-      if (divisionId) userToPromote.division = divisionId;
-    } else if (adminUser.role === "admin") {
-      if (newRole !== "instructor") {
-        return res
-          .status(403)
-          .json({ message: "Admins can only promote students to instructors" });
-      }
-      if (userToPromote.role !== "student") {
-        return res
-          .status(400)
-          .json({ message: "Only students can be promoted by admins" });
-      }
-      if (userToPromote.division.toString() !== adminUser.division.toString()) {
-        return res.status(403).json({
-          message: "You can only promote students within your own division",
-        });
-      }
-      // 🔥 NEW: Check if the student is verified
-      if (!userToPromote.verified) {
-        return res.status(403).json({
-          message:
-            "Student must verify their email before they can be promoted",
-        });
-      }
-      userToPromote.role = "instructor";
-    } else {
-      return res
-        .status(403)
-        .json({ message: "Insufficient permissions to promote users" });
-    }
-
-    await userToPromote.save();
-
-    // If promoted to instructor, add to the Division instructors array
-    if (userToPromote.role === "instructor") {
-      await Division.findByIdAndUpdate(userToPromote.division, {
-        $addToSet: { instructors: userToPromote._id },
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `User promoted to ${userToPromote.role} and added to division records`,
-      data: userToPromote,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server Error", error: error.message });
-  }
-};
-
-// @desc    Create new user
 export const createUser = async (req, res) => {
   try {
     const { email, role, division } = req.body;
-    const creator = req.user;
 
-    // 1. Email Format Validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
-    }
 
-    // RBAC check for user creation
-    if (creator.role === "admin") {
-      if (role && role !== "student") {
-        return res
-          .status(403)
-          .json({ message: "Admins can only create students" });
-      }
-      // Ensure student is created in admin's division
-      req.body.division = creator.division;
-    }
-
-    // 1. Check if user already exists (Case-Insensitive)
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    // 1. Check if user already exists
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log(`[AUTH] Attempted to create duplicate user: ${email}`);
-      return res.status(400).json({
-        success: false,
-        message: "User already exists with this email",
-      });
+      return res.status(400).json({ message: "User already exists with this email" });
     }
 
-    // 2. Generate a random temporary password
+    // 2. Generate a random temporary password (e.g., 8 bytes hex = 16 characters)
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
@@ -135,64 +27,273 @@ export const createUser = async (req, res) => {
     const user = await User.create({
       email,
       password: hashedPassword,
-      role: role || "student",
-      division: req.body.division || undefined,
-      firstLogin: true,
-      verified: false,
+      role: role || "student", // default to student if not provided
+      division: division || undefined,
+      firstLogin: true, // As per your requirements
+      verified: false
     });
 
+    // 4. Send email with credentials (commented out actual send for local testing speed, but it's ready)
+    // await sendEmail({
+    //   to: email,
+    //   subject: "Welcome to BMS - Your Login Credentials",
+    //   text: `Your account has been created.\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease login to verify your account and change your password.`
+    // });
+
+    // 5. Send response (Returning tempPassword here so you can easily test in Postman!)
     res.status(201).json({
       success: true,
       message: "User created successfully",
       data: {
         id: user._id,
         email: user.email,
-        role: user.role,
+        role: user.role
       },
-      tempPassword,
+      tempPassword // ⚠️ REMOVE THIS IN PRODUCTION - Only here for testing purposes so you don't have to check emails
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// @desc    Get all users
+// @route   GET /api/v1/users
+// @access  Public (for now) / Admin
+export const getUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-password");
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
-// @desc    Get current user profile
+// @desc    Promote User to a new role
+// @route   PATCH /users/:id/promote
+// @access  Private (super_admin or division_admin)
+export const promoteUser = async (req, res) => {
+  try {
+    const { newRole, divisionId, reason } = req.body;
+    const targetUserId = req.params.id;
+
+    // To test without RBAC auth: mock a super_admin user as the requester.
+    let requester = req.user;
+    if (!requester) {
+      requester = await User.findOne({ role: 'super_admin' });
+      // If there's no super_admin, just fake one to prevent crashes during tests:
+      if (!requester) {
+        requester = {
+          _id: new crypto.randomBytes(12).toString("hex"), // Fake ID
+          role: 'super_admin'
+        };
+      }
+    }
+
+    if (!requester || !['super_admin', 'division_admin', 'admin'].includes(requester.role)) {
+      return res.status(403).json({ message: "Not authorized to promote users" });
+    }
+
+    const user = await User.findById(targetUserId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user._id.toString() === requester._id.toString()) {
+      return res.status(400).json({ message: "You cannot promote yourself" });
+    }
+
+    const oldRole = user.role;
+
+    // 1. Promote to Instructor (Requested by Division Admin or Super Admin)
+    if (newRole === 'instructor') {
+      if (requester.role === 'super_admin') {
+        if (oldRole !== 'student' && oldRole !== 'admin' && oldRole !== 'division_admin') {
+          return res.status(400).json({ message: "Super Admin can only promote students or admins to instructor" });
+        }
+      } else {
+        if (oldRole !== 'student') {
+          return res.status(400).json({ message: "Admins can only promote students to instructor" });
+        }
+      }
+
+      // Div Admin must be in the same division
+      if (requester.role === 'division_admin' || requester.role === 'admin') {
+        if (!user.division || user.division.toString() !== requester.division?.toString()) {
+          return res.status(403).json({ message: "Cannot promote a user outside of your division" });
+        }
+      }
+
+      // Generate temp credentials
+      const tempPassRaw = crypto.randomBytes(8).toString('hex');
+      const hashedTempPass = await bcrypt.hash(tempPassRaw, 10);
+
+      // Generate Instructor ID
+      let divCode = "GEN";
+      if (user.division) {
+        const div = await Division.findById(user.division);
+        if (div) divCode = div.name.substring(0, 3).toUpperCase();
+      }
+      const count = await User.countDocuments({ role: "instructor", division: user.division });
+      const instructorId = `INS-${divCode}-${String(count + 1).padStart(4, "0")}`;
+
+      user.role = 'instructor';
+      user.firstLogin = true;
+      user.password = hashedTempPass; // Update main password or temp, resetting their access
+      user.temporaryPassword = hashedTempPass;
+      user.instructorId = instructorId;
+
+      await user.save();
+
+      // Create Audit Log
+      await RoleHistory.create({
+        userId: user._id,
+        previousRole: oldRole,
+        newRole: 'instructor',
+        changedBy: requester._id,
+        divisionId: user.division,
+        reason: reason || "Promoted to instructor"
+      });
+
+      // Email would be sent here
+      // await sendEmail(...)
+
+      return res.status(200).json({
+        success: true,
+        message: "User promoted to instructor successfully",
+        userId: user._id,
+        newRole: "instructor",
+        instructorId: instructorId,
+        tempPassword: tempPassRaw // Return for testing
+      });
+    }
+
+    // 2. Promote to Division Admin (Requested by Super Admin)
+    if (newRole === 'division_admin' || newRole === 'admin') {
+      if (requester.role !== 'super_admin') {
+        return res.status(403).json({ message: "Only Super Admin can promote to Division Admin" });
+      }
+
+      if (['division_admin', 'super_admin', 'admin'].includes(oldRole)) {
+        return res.status(400).json({ message: "User is already an admin" });
+      }
+
+      // Allow updating division during promotion or stick to existing
+      const finalDivisionId = divisionId || user.division;
+      if (!finalDivisionId) {
+         return res.status(400).json({ message: "User must be assigned to a division to be a division admin. Provide a 'divisionId' in the request." });
+      }
+
+      const tempPassRaw = crypto.randomBytes(8).toString('hex');
+      const hashedTempPass = await bcrypt.hash(tempPassRaw, 10);
+
+      user.role = newRole; // Handle if they pass 'admin' or 'division_admin'
+      user.division = finalDivisionId;
+      user.firstLogin = true;
+      user.password = hashedTempPass;
+      user.temporaryPassword = hashedTempPass;
+
+      await user.save();
+
+      await RoleHistory.create({
+        userId: user._id,
+        previousRole: oldRole,
+        newRole: newRole,
+        changedBy: requester._id,
+        divisionId: user.division,
+        reason: reason || "Promoted to division admin"
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "User promoted to division admin successfully",
+        userId: user._id,
+        newRole: newRole,
+        tempPassword: tempPassRaw // Return for testing
+      });
+    }
+
+    return res.status(400).json({ message: `Invalid promotion newRole: ${newRole}` });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// @desc    Get currently logged in user
 // @route   GET /api/v1/users/me
 // @access  Private
 export const getMe = async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    const user = await User.findById(req.user._id).select("-password");
+    // req.user is set in authMiddleware
+    const user = await User.findById(req.user._id).select("-password").populate("division", "name");
+    
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    res.status(200).json({
-      success: true,
-      data: user,
-    });
+    res.status(200).json({ success: true, data: user });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
-// @desc    Get user by ID
+// @desc    Get single user by ID
 // @route   GET /api/v1/users/:id
-// @access  Private/Admin
-export const getUserById = async (req, res) => {
+// @access  Public / Private (Admin)
+export const getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findById(req.params.id).select("-password").populate("division", "name");
+    
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    res.status(200).json({
-      success: true,
-      data: user,
-    });
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// @desc    Update single user
+// @route   PUT /api/v1/users/:id
+// @access  Private
+export const updateUser = async (req, res) => {
+  try {
+    const { email, role, division } = req.body;
+    let user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (email) user.email = email;
+    if (role) user.role = role;
+    if (division) user.division = division;
+
+    await user.save();
+    
+    res.status(200).json({ success: true, message: "User updated successfully", data: user });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+// @desc    Delete single user
+// @route   DELETE /api/v1/users/:id
+// @access  Private
+export const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({ success: true, message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }

@@ -71,18 +71,18 @@ export const createSession = async (req, res) => {
         {
           division,
           startTime: { $lt: end },
-          endTime: { $gt: start },
+          endTime: { $gt: start }
         },
         {
           instructor,
           startTime: { $lt: end },
-          endTime: { $gt: start },
-        },
-      ],
+          endTime: { $gt: start }
+        }
+      ]
     };
 
     const conflict = await Session.findOne(conflictQuery);
-
+    
     if (conflict) {
       return res.status(409).json({ error: "Session time conflict" });
     }
@@ -124,6 +124,20 @@ export const getSessions = async (req, res) => {
     res
       .status(200)
       .json({ success: true, count: sessions.length, data: sessions });
+  } catch (error) {
+    res.status(500).json({ error: "Server Error", message: error.message });
+  }
+};
+
+export const deleteSession = async (req, res) => {
+  try {
+    const session = await Session.findByIdAndDelete(req.params.id);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Session deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
