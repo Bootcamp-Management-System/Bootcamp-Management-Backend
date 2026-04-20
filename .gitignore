@@ -1,21 +1,22 @@
 # Dependencies
 node_modules/
 
-# Environment variables
+# Environment
 .env
 
-# VS Code history
-.history/
+# IDE
+.vscode/
 
 # Logs
-logs
-*.log
 npm-debug.log*
 
-# OS files
-.DS_Store
-Thumbs.db
+# Postman
+.postman/
+postman/
 
+# Scripts
+seed_admin.js
+API_DOCUMENTATION.md
 # Build folders
 dist/
 build/

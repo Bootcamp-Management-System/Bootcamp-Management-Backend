@@ -1,6 +1,10 @@
 import Division from "../models/Division.js";
 import User from "../models/User.js";
 
+/**
+ * @desc    Create a new division
+ * @route   POST /api/divisions
+ */
 export const createDivision = async (req, res) => {
   try {
     const { name, description, instructors } = req.body;
@@ -10,6 +14,7 @@ export const createDivision = async (req, res) => {
       return res.status(400).json({ error: "Division with this name already exists" });
     }
 
+    // Verify that provided instructor IDs actually exist and are admins
     if (instructors && instructors.length > 0) {
       const foundAdmins = await User.find({
         _id: { $in: instructors },
@@ -32,15 +37,30 @@ export const createDivision = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get all divisions (Filtered by RBAC for admins)
+ * @route   GET /api/divisions
+ */
 export const getDivisions = async (req, res) => {
   try {
-    const divisions = await Division.find().populate("instructors", "email role");
+    const filter = {};
+
+    // RBAC: If user is an admin, restrict them to seeing only their own division
+    if (req.user.role === 'admin' && req.user.division) {
+      filter._id = req.user.division;
+    }
+
+    const divisions = await Division.find(filter).populate("instructors", "email role");
     res.status(200).json({ success: true, count: divisions.length, data: divisions });
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
 };
 
+/**
+ * @desc    Update division details (name/description only)
+ * @route   PATCH /api/divisions/:id
+ */
 export const updateDivision = async (req, res) => {
   try {
     const allowedUpdates = ["name", "description"];
@@ -57,6 +77,7 @@ export const updateDivision = async (req, res) => {
       return res.status(404).json({ error: "Division not found" });
     }
 
+    // Check for name uniqueness if name is being changed
     if (req.body.name && req.body.name !== division.name) {
       const existingDivision = await Division.findOne({ name: req.body.name });
       if (existingDivision) {
@@ -74,18 +95,17 @@ export const updateDivision = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Division updated successfully",
-      data: {
-        _id: division._id,
-        name: division.name,
-        description: division.description,
-        instructors: division.instructors // Returning it exactly as in backend but untouched by this request
-      }
+      data: division
     });
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
 };
 
+/**
+ * @desc    Delete a division
+ * @route   DELETE /api/divisions/:id
+ */
 export const deleteDivision = async (req, res) => {
   try {
     const division = await Division.findByIdAndDelete(req.params.id);
@@ -100,11 +120,14 @@ export const deleteDivision = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get all users belonging to a specific division
+ * @route   GET /api/divisions/:divisionId/users
+ */
 export const getUsersByDivision = async (req, res) => {
   try {
     const { divisionId } = req.params;
 
-    // Fetch users where the division matches the requested divisionId
     const users = await User.find({ division: divisionId }).select(
       "_id name email role division"
     );

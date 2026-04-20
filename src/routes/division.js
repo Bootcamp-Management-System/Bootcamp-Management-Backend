@@ -1,18 +1,25 @@
 import express from "express";
-import { createDivision, getDivisions, updateDivision, deleteDivision, getUsersByDivision } from "../controllers/divisionController.js";
-import { authMiddleware as protect } from "../middlewares/auth.js";
+import { 
+  createDivision, 
+  getDivisions, 
+  updateDivision, 
+  deleteDivision, 
+  getUsersByDivision 
+} from "../controllers/divisionController.js";
+import { authMiddleware as protect, restrictTo } from "../middlewares/auth.js";
 
 const router = express.Router();
 
+router.use(protect);
+
 router.route("/")
-  .post(createDivision)
-  .get(getDivisions);
+  .post(restrictTo("super-admin"), createDivision)
+  .get(restrictTo("super-admin", "admin"), getDivisions);
 
 router.route("/:id")
-  .put(updateDivision)
-  .delete(deleteDivision);
+  .patch(restrictTo("super-admin"), updateDivision)
+  .delete(restrictTo("super-admin"), deleteDivision);
 
-router.route("/:divisionId/users")
-  .get(getUsersByDivision);
+router.get("/:divisionId/users", restrictTo("super-admin", "admin"), getUsersByDivision);
 
 export default router;
