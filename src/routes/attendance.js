@@ -7,8 +7,8 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/check-in", authorizeRole("student"), checkIn);
+router.post("/check-in", authorizeRole("super-admin", "admin", "instructor"), checkIn);
 router.post("/mark", authorizeRole("super-admin", "admin", "instructor"), markAttendance);
 router.get("/", getAttendance);
 
-export default router;
+export default router;

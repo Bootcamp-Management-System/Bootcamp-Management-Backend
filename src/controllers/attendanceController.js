@@ -3,13 +3,27 @@ import Session from "../models/Session.js";
 
 export const checkIn = async (req, res) => {
   try {
-    const { session: sessionId, note } = req.body;
-    const studentId = req.user.id;
+    const { session: sessionId, studentId, note } = req.body;
+    const marker = req.user;
 
     if (!sessionId) return res.status(400).json({ error: "Session ID is required" });
+    if (!studentId) return res.status(400).json({ error: "Student ID is required" });
 
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Authorization checks
+    if (marker.role === 'admin') {
+      if (session.division.toString() !== marker.division.toString()) {
+        return res.status(403).json({ error: "You can only perform check-in for sessions in your division" });
+      }
+    } else if (marker.role === 'instructor') {
+      if (session.instructor.toString() !== marker.id.toString()) {
+        return res.status(403).json({ error: "You can only perform check-in for your own sessions" });
+      }
+    } else if (marker.role !== 'super-admin') {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
 
     const existingAttendance = await Attendance.findOne({ student: studentId, session: sessionId });
     if (existingAttendance) {
@@ -109,4 +123,4 @@ export const getAttendance = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
-};
+};
