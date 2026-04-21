@@ -288,16 +288,18 @@ Common response shape:
 ## Attendance
 
 ### POST `/attendance/check-in`
-- Access: Authenticated, `student`
+- Access: Authenticated, `super-admin`, `admin`, or `instructor`
 - Body (`req.body`):
   ```json
   {
     "session": "session_id",
+    "studentId": "student_id",
     "note": "Optional note"
   }
   ```
 - Notes:
-  - If a student checks in **> 10 minutes** after the session's `startTime`, they are automatically marked as `"Late"`. Otherwise, they are `"Present"`.
+  - Used by instructors or admins to check a student in. 
+  - If the check-in time is **> 10 minutes** after the session's `startTime`, the student is automatically marked as `"Late"`. Otherwise, `"Present"`.
 - Response: `201 Created` with `{ success: true, data: attendance }`
 
 ### POST `/attendance/mark`
@@ -312,6 +314,7 @@ Common response shape:
   }
   ```
 - Notes:
+  - Valid values for `status`: `"Present"`, `"Late"`, `"Absent"`, `"Excused"`.
   - Edits/Manual marking can **only occur within 24 hours** of the session's `endTime`. Attempts to modify attendance after this window will return a `400 Bad Request`.
 - Response: `200 OK` with `{ success: true, data: attendance }`
 
@@ -323,6 +326,10 @@ Common response shape:
     "sessionId": "session_id"
   }
   ```
+- Notes:
+  - For students, it returns only their own attendance records.
+  - For instructors, it returns attendance records for their sessions.
+  - For admins, it returns attendance records across their division.
 - Body: none
 - Response: `200 OK` with `{ success: true, count, data: attendance[] }`
 
