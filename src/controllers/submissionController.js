@@ -1,18 +1,60 @@
 import Submission from "../models/Submission.js";
 import Task from "../models/Task.js";
 
+const getUserDivisionId = (user) => {
+  if (user?.division) return user.division;
+  if (Array.isArray(user?.assignedDivisions) && user.assignedDivisions.length > 0) {
+    return user.assignedDivisions[0];
+  }
+  return null;
+};
+
+const userHasDivisionAccess = (user, divisionId) => {
+  if (!divisionId) return false;
+
+  if (user?.division && user.division.toString() === divisionId.toString()) {
+    return true;
+  }
+
+  if (Array.isArray(user?.assignedDivisions)) {
+    return user.assignedDivisions.some((assignedDivisionId) => {
+      return assignedDivisionId && assignedDivisionId.toString() === divisionId.toString();
+    });
+  }
+
+  return false;
+};
+
 // @desc    Submit a task (Student only)
 export const submitTask = async (req, res) => {
   try {
-    const { taskId, contentUrl, comment } = req.body;
+    const taskId = req.params.taskId || req.body.taskId;
+    const { contentUrl, comment, repository_url, repositoryUrl, repoUrl, link, url } = req.body;
     const studentId = req.user.id;
+    const submissionUrl = contentUrl || repository_url || repositoryUrl || repoUrl || link || url;
 
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ error: "Task not found" });
 
+    if (!submissionUrl) {
+      return res.status(400).json({ error: "Submission content (URL/Link) is required" });
+    }
+
     // Verify student is in the task's division
-    if (req.user.division.toString() !== task.division.toString()) {
-       return res.status(403).json({ error: "You cannot submit tasks for a different division" });
+    const taskDivisionId = task.division;
+
+    if (!userHasDivisionAccess(req.user, taskDivisionId)) {
+      return res.status(403).json({ error: "You are not assigned to a division" });
+    }
+
+    if (!req.user.division) {
+      req.user.division = taskDivisionId;
+      await req.user.save();
+    }
+
+    const studentDivisionId = getUserDivisionId(req.user);
+    if (studentDivisionId && studentDivisionId.toString() !== taskDivisionId.toString()) {
+      return res.status(403).json({ error: "You cannot submit tasks for a different division" });
     }
 
     // Check deadline
@@ -23,7 +65,7 @@ export const submitTask = async (req, res) => {
     const submission = await Submission.create({
       task: taskId,
       student: studentId,
-      contentUrl,
+      contentUrl: submissionUrl,
       comment
     });
 
@@ -79,7 +121,8 @@ export const reviewSubmission = async (req, res) => {
     if (!submission) return res.status(404).json({ error: "Submission not found" });
 
     // RBAC check: Reviewer must be in the same division
-    if (req.user.role === 'admin' && req.user.division.toString() !== submission.task.division.toString()) {
+     const reviewerDivisionId = getUserDivisionId(req.user);
+     if (req.user.role === 'admin' && !userHasDivisionAccess(req.user, submission.task.division)) {
        return res.status(403).json({ error: "You can only review submissions in your division" });
     }
     // Instructors might have more granular checks (if assigned) - for now keep it simple

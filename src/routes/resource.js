@@ -1,6 +1,7 @@
 import express from "express";
-import { uploadResource, getResources, getResourcesByDivision, deleteResource, getResourceById } from "../controllers/resourceController.js";
-import { authMiddleware, restrictTo } from "../middlewares/auth.js";
+import { uploadResource, getResources, getResourcesByDivision, deleteResource, getResourceById, downloadResource } from "../controllers/resourceController.js";
+import { authMiddleware } from "../middlewares/auth.js";
+import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
 import upload from "../middlewares/upload.js";
 
 const router = express.Router();
@@ -12,7 +13,7 @@ router.use(authMiddleware);
 // Must use multer upload.single('file') before the controller
 router.post(
   "/upload",
-  restrictTo("super_admin", "admin", "division_admin", "instructor"),
+  authorizeRole("super-admin", "admin", "instructor"),
   (req, res, next) => {
     upload.single("file")(req, res, function (err) {
       if (err) {
@@ -33,7 +34,10 @@ router.get("/division/:division_id", getResourcesByDivision);
 // Get single resource
 router.get("/:resource_id", getResourceById);
 
+// Download single resource file
+router.get("/:resource_id/download", downloadResource);
+
 // Delete resource
-router.delete("/:resource_id", restrictTo("super_admin", "admin", "division_admin", "instructor"), deleteResource);
+router.delete("/:resource_id", authorizeRole("super-admin", "admin", "instructor"), deleteResource);
 
 export default router;

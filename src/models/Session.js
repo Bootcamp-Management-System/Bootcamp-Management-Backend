@@ -18,7 +18,7 @@ const sessionSchema = new mongoose.Schema(
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Instructor ID is required"],
+      // Removed required as per request
     },
     location: {
       type: String,

@@ -2,39 +2,33 @@ import express from "express";
 import {
   createSession,
   getSessions,
+  updateSession,
+  deleteSession,
+  assignInstructor
 } from "../controllers/sessionController.js";
-import {
-  checkDivisionAccess,
-  authMiddleware as protect,
-  restrictTo,
-} from "../middlewares/auth.js";
+import { getResourcesBySession } from "../controllers/resourceController.js";
+import { authMiddleware } from "../middlewares/auth.js";
+import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { checkDivisionAccess } from "../middlewares/roleBase/divisionMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect);
+router.use(authMiddleware);
 
 router
   .route("/")
-  .post(restrictTo("super-admin", "admin"), checkDivisionAccess, createSession)
+  .post(authorizeRole("super-admin", "admin"), checkDivisionAccess, createSession)
   .get(checkDivisionAccess, getSessions);
 
-export default router;
-import { createSession, getSessions, updateSession, deleteSession } from "../controllers/sessionController.js";
-import { getResourcesBySession } from "../controllers/resourceController.js";
-import { authMiddleware } from "../middlewares/auth.js";
+router
+  .route("/:id")
+  .put(authorizeRole("super-admin", "admin"), checkDivisionAccess, updateSession)
+  .delete(authorizeRole("super-admin", "admin"), checkDivisionAccess, deleteSession);
 
-const router = express.Router();
+router
+  .route("/:id/assign-instructor")
+  .patch(authorizeRole("super-admin", "admin"), checkDivisionAccess, assignInstructor);
 
-// router.use(authMiddleware); // Temporarily disabled for testing
-
-router.route("/")
-  .post(createSession)
-  .get(getSessions);
-
-router.route("/:id")
-  .put(updateSession)
-  .delete(deleteSession);
-
-router.get("/:session_id/resources", getResourcesBySession);
+router.get("/:session_id/resources", checkDivisionAccess, getResourcesBySession);
 
 export default router;

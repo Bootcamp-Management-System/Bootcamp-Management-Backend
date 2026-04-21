@@ -3,6 +3,7 @@ import Division from "../models/Division.js";
 import Session from "../models/Session.js";
 import path from "path";
 import fs from "fs";
+import * as resourceService from "../services/resourceService.js";
 
 export const uploadResource = async (req, res) => {
   try {
@@ -32,14 +33,14 @@ export const uploadResource = async (req, res) => {
     }
 
     // Role-based Access Control for Uploads
-    if (userRole === "admin" || userRole === "division_admin" || userRole === "instructor") {
+    if (userRole === "admin" || userRole === "instructor") {
       // Must be same division for admin or instructor
       if (req.user.division && req.user.division.toString() !== division_id.toString()) {
          // Cleanup uploaded file since they shouldn't have uploaded it here
          fs.unlinkSync(req.file.path);
          return res.status(403).json({ message: "You can only upload resources to your assigned division" });
       }
-    } else if (userRole !== "super_admin") {
+    } else if (userRole !== "super-admin") {
       // Default students/others block
       fs.unlinkSync(req.file.path);
       return res.status(403).json({ message: "You do not have permission to upload resources" });
@@ -79,9 +80,9 @@ export const getResources = async (req, res) => {
     let query = {};
 
     // Filter resources by role logic
-    if (userRole === "super_admin") {
+    if (userRole === "super-admin") {
       query = {}; // Access all resources
-    } else if (["admin", "division_admin", "instructor", "student"].includes(userRole)) {
+    } else if (["admin", "instructor", "student"].includes(userRole)) {
       if (req.user.division) {
          // See public resources or resources in their division
          query = {
@@ -128,7 +129,7 @@ export const getResourcesByDivision = async (req, res) => {
     const { division_id } = req.params;
     const userRole = req.user.role;
 
-    if (userRole !== "super_admin") {
+    if (userRole !== "super-admin") {
       if (req.user.division && req.user.division.toString() !== division_id) {
          return res.status(403).json({ message: "You only have access to your own division's resources" });
       }
@@ -171,11 +172,15 @@ export const deleteResource = async (req, res) => {
     if (!resource) return res.status(404).json({ message: "Resource not found" });
 
     // Validate Delete Privileges
-    if (userRole === "super_admin") {
+    if (userRole === "super-admin") {
        // Super Admin deletes anything
-    } else if (userRole === "admin" || userRole === "division_admin") {
+    } else if (userRole === "admin") {
        if (req.user.division?.toString() !== resource.division_id.toString()) {
           return res.status(403).json({ message: "You can only delete resources within your own division" });
+       }
+       // Admins cannot delete Super Admin resources
+       if (resource.uploader_role === "super-admin") {
+          return res.status(403).json({ message: "Admins cannot delete resources uploaded by Super Admin" });
        }
     } else if (userRole === "instructor") {
        if (req.user._id.toString() !== resource.uploaded_by.toString()) {
@@ -256,5 +261,18 @@ export const getResourcesBySession = async (req, res) => {
     res.status(200).json({ success: true, count: resources.length, data: resources });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+export const downloadResource = async (req, res) => {
+  try {
+    const { path: filePath, filename } = await resourceService.getDownloadableResource(
+      req.params.resource_id,
+      req.user
+    );
+
+    res.download(filePath, filename);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
   }
 };

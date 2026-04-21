@@ -6,20 +6,21 @@ import {
   deleteDivision, 
   getUsersByDivision 
 } from "../controllers/divisionController.js";
-import { authMiddleware as protect, restrictTo } from "../middlewares/auth.js";
+import { authMiddleware as protect } from "../middlewares/auth.js";
+import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
 
 const router = express.Router();
 
 router.use(protect);
 
 router.route("/")
-  .post(restrictTo("super-admin"), createDivision)
-  .get(restrictTo("super-admin", "admin"), getDivisions);
+  .post(authorizeRole("super-admin"), createDivision)
+  .get(authorizeRole("super-admin", "admin"), getDivisions);
 
 router.route("/:id")
-  .patch(restrictTo("super-admin"), updateDivision)
-  .delete(restrictTo("super-admin"), deleteDivision);
+  .patch(authorizeRole("super-admin"), updateDivision)
+  .delete(authorizeRole("super-admin"), deleteDivision);
 
-router.get("/:divisionId/users", restrictTo("super-admin", "admin"), getUsersByDivision);
+router.get("/:divisionId/users", authorizeRole("super-admin", "admin"), getUsersByDivision);
 
 export default router;

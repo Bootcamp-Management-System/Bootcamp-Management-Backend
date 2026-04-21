@@ -2,46 +2,60 @@ import express from "express";
 import {
   createUser,
   getMe,
-  getUserById,
   getUsers,
   promoteUser,
+  getUser,
+  updateUser,
+  deleteUser
 } from "../controllers/userController.js";
-import { authMiddleware as protect, restrictTo } from "../middlewares/auth.js";
+import { authMiddleware } from "../middlewares/auth.js";
+import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect);
+// Allow initial setup of super-admin ONLY if no users exist
+router.post("/setup", async (req, res) => {
+  const User = (await import("../models/User.js")).default;
+  const count = await User.countDocuments();
+  if (count > 0) {
+    return res.status(403).json({ message: "Setup already completed. Use regular login." });
+  }
 
-router.post("/promote", restrictTo("super-admin", "admin"), promoteUser);
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+
+  const crypto = (await import("crypto")).default;
+  const bcrypt = (await import("bcryptjs")).default;
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const user = await User.create({
+    email,
+    password: hashedPassword,
+    role: "super-admin",
+    firstLogin: false,
+    verified: true
+  });
+  
+  res.status(201).json({ success: true, message: "Super Admin created. You can now login.", data: { id: user._id, email, role: user.role }});
+});
+
+// Apply auth to all other user routes
+router.use(authMiddleware);
+
+// POST /users/promote
+router.post("/promote", authorizeRole("super-admin", "admin"), promoteUser);
+// PATCH /users/:id/promote
+router.patch("/:id/promote", authorizeRole("super-admin", "admin"), promoteUser);
 
 router
   .route("/")
-  .post(restrictTo("super-admin", "admin"), createUser)
-  .get(restrictTo("super-admin", "admin"), getUsers);
+  .post(authorizeRole("super-admin", "admin"), createUser)
+  .get(authorizeRole("super-admin", "admin"), getUsers);
 
 router.get("/me", getMe);
-router.get("/:id", restrictTo("super-admin", "admin"), getUserById);
-import { createUser, getUsers, promoteUser, getMe, getUser, updateUser, deleteUser } from "../controllers/userController.js";
-import { authMiddleware } from "../middlewares/auth.js"; // We will add security later
 
-const router = express.Router();
-
-// Normally this route would be restricted to Admins only like this:
-// router.post("/", protect, authorize("admin"), createUser);
-
-// For testing right now, keeping it open so you can create your first user
-router.post("/", createUser);
-router.get("/", getUsers);
-
-// GET /users/me - Requires auth to know who "me" is
-router.get("/me", authMiddleware, getMe);
-
-// GET /users/:id - Must come AFTER /me 
 router.get("/:id", getUser);
-router.put("/:id", updateUser);
-router.delete("/:id", deleteUser);
-
-// PATCH /users/:id/promote
-router.patch("/:id/promote", promoteUser);
+router.put("/:id", authorizeRole("super-admin", "admin"), updateUser);
+router.delete("/:id", authorizeRole("super-admin"), deleteUser);
 
 export default router;

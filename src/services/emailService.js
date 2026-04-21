@@ -40,14 +40,6 @@ const sendEmail = async (options) => {
       `
     };
 
-    // Log the email content exactly to the terminal BEFORE trying to send it
-    console.log(`\n=======================================`);
-    console.log(`✉️  EMAIL CONTENT (FOR TESTING)`);
-    console.log(`To: ${options.to}`);
-    console.log(`Subject: ${options.subject}`);
-    console.log(`Content: ${options.text}`);
-    console.log(`=======================================\n`);
-
     await transporter.sendMail(mailOptions);
     console.log(`📧 Email sent to ${options.to}`);
   } catch (error) {

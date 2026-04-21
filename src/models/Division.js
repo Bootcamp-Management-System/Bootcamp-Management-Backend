@@ -5,7 +5,6 @@ const divisionSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, "Division name is required"],
-      enum: ["cyber", "cpd", "datascience", "development"],
       unique: true,
       trim: true,
     },

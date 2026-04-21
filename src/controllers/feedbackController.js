@@ -2,6 +2,29 @@ import mongoose from "mongoose";
 import Feedback from "../models/Feedback.js";
 import Session from "../models/Session.js";
 
+const getUserDivisionId = (user) => {
+  if (user.division) return user.division.toString();
+  if (user.assignedDivisions && user.assignedDivisions.length > 0) {
+    return user.assignedDivisions[0].toString();
+  }
+  return null;
+};
+
+const userHasDivisionAccess = (user, targetDivisionId) => {
+  if (!targetDivisionId) return true;
+  const targetStr = targetDivisionId.toString();
+  
+  if (user.role === 'super-admin') return true;
+  
+  if (user.division && user.division.toString() === targetStr) return true;
+  
+  if (user.assignedDivisions && user.assignedDivisions.length > 0) {
+    return user.assignedDivisions.some(div => div.toString() === targetStr);
+  }
+  
+  return false;
+};
+
 // @desc    Submit feedback for a session
 export const submitFeedback = async (req, res) => {
   try {
@@ -15,7 +38,7 @@ export const submitFeedback = async (req, res) => {
     }
 
     // 2. Ensure student is in same division as session
-    if (req.user.division.toString() !== session.division.toString()) {
+    if (!userHasDivisionAccess(req.user, session.division)) {
       return res.status(403).json({ error: "You can only provide feedback for your division's sessions" });
     }
 
@@ -51,7 +74,11 @@ export const getFeedback = async (req, res) => {
       const sessionIds = sessions.map(s => s._id);
       filter.session = { $in: sessionIds };
     } else if (user.role === 'admin') {
-      filter.division = user.division;
+      if (user.division) {
+        filter.division = user.division;
+      } else if (user.assignedDivisions && user.assignedDivisions.length > 0) {
+        filter.division = { $in: user.assignedDivisions };
+      }
     }
     // Super-admin sees everything (filter stays empty)
 
