@@ -6,7 +6,7 @@ import sendEmail from "./emailService.js";
 
 const generateToken = (id, tokenVersion = 0) => {
   return jwt.sign({ id, tokenVersion }, process.env.JWT_ACCESS_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRES || "15m",
+    expiresIn: process.env.JWT_ACCESS_EXPIRES || "24h",
   });
 };
 

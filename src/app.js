@@ -13,6 +13,7 @@ import attendanceRoutes from "./routes/attendance.js";
 import taskRoutes from "./routes/task.js";
 import submissionRoutes from "./routes/submission.js";
 import feedbackRoutes from "./routes/feedback.js";
+import notificationRoutes from "./routes/notification.js";
 
 dotenv.config({ path: "src/config/.env" });
 // import attendanceRoutes from "./routes/attendance.js";
@@ -55,6 +56,7 @@ app.use("/api/v1/attendance", attendanceRoutes);
 app.use("/api/v1/tasks", taskRoutes);
 app.use("/api/v1/submissions", submissionRoutes);
 app.use("/api/v1/feedback", feedbackRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 // app.use("/api/v1/attendance", attendanceRoutes);
 app.use("/api/v1/resources", resourceRoutes); // Note: Original Prompt requested /resources/upload but your API convention uses /api/v1 as a prefix. I will assign this router to /api/v1/resources

@@ -506,6 +506,43 @@ Common response shape:
 - Body: none
 - Response: `200 OK` with `{ success: true, data: { averageRating, totalFeedbacks } }`
 
+## Notifications
+
+### POST `/notifications`
+- Access: Authenticated, `super-admin` or `admin`
+- Body (`req.body`): Send a notification to either one user (`recipientId`) or perfectly broadcast it to an entire division (`divisionId`).
+  ```json
+  {
+    "title": "New Bootcamp Material uploaded!",
+    "message": "Welcome. Check resources module.",
+    "type": "info",
+    "recipientId": "student_user_id" 
+    // OR "divisionId": "division_id"
+  }
+  ```
+- Response: `201 Created` with `{ success: true, count, message: "Notifications dispatched" }`
+
+### GET `/notifications`
+- Access: Authenticated
+- Body: none
+- Response: `200 OK` with `{ success: true, count, data: notifications[] }`
+
+### GET `/notifications/unread-count`
+- Access: Authenticated
+- Body: none
+- Response: `200 OK` with `{ success: true, unreadCount }`
+
+### PATCH `/notifications/:id/read`
+- Access: Authenticated
+- Params (`req.params`): `id` (the notification ID)
+- Body: none
+- Response: `200 OK` with `{ success: true, data: notification_marked_read }`
+
+### PATCH `/notifications/read-all`
+- Access: Authenticated
+- Body: none
+- Response: `200 OK` with `{ success: true, message: "All notifications marked as read" }`
+
 ## Resources
 
 ### POST `/resources/upload`
