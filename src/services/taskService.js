@@ -2,7 +2,7 @@ import Task from "../models/Task.js";
 import Session from "../models/Session.js";
 
 export const createTask = async (taskData, creator) => {
-  const { title, description, startTime, endTime, deadline, division, session } = taskData;
+  const { title, description, startTime, endTime, deadline, bootcamp, session } = taskData;
 
   if (session) {
     const sessionData = await Session.findById(session);
@@ -11,8 +11,8 @@ export const createTask = async (taskData, creator) => {
       err.statusCode = 404;
       throw err;
     }
-    if (sessionData.division.toString() !== division.toString()) {
-      const err = new Error("Session does not belong to the specified division");
+    if (sessionData.bootcamp.toString() !== bootcamp.toString()) {
+      const err = new Error("Session does not belong to the specified bootcamp");
       err.statusCode = 400;
       throw err;
     }
@@ -24,7 +24,7 @@ export const createTask = async (taskData, creator) => {
     startTime,
     endTime,
     deadline,
-    division,
+    bootcamp,
     session,
     createdBy: creator.id
   });
@@ -35,16 +35,15 @@ export const createTask = async (taskData, creator) => {
 export const getTasks = async (user, queryData) => {
   const filter = {};
 
-  if (queryData.division) {
-    filter.division = queryData.division;
+  if (queryData.bootcamp) {
+    filter.bootcamp = queryData.bootcamp;
   }
 
-  if (user.role === 'student' && user.division) {
-    filter.division = user.division;
-  }
+  // user.division check is removed for students because bootcampGuard handles filtering
+  // Admins can pass bootcamp in queryData, which is handled above.
 
   const tasks = await Task.find(filter)
-    .populate("division", "name")
+    .populate("bootcamp", "name")
     .populate("session", "title")
     .populate("createdBy", "email role");
 
@@ -53,7 +52,7 @@ export const getTasks = async (user, queryData) => {
 
 export const getTaskById = async (id) => {
   const task = await Task.findById(id)
-    .populate("division", "name")
+    .populate("bootcamp", "name")
     .populate("session", "title")
     .populate("createdBy", "email role");
     

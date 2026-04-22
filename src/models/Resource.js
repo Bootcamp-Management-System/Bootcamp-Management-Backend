@@ -17,9 +17,9 @@ const resourceSchema = new mongoose.Schema({
   file_type: {
     type: String,
   },
-  division_id: {
+  bootcamp_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Division',
+    ref: 'Bootcamp',
     required: [true, 'Division ID is required'],
   },
   session_id: {
@@ -37,8 +37,8 @@ const resourceSchema = new mongoose.Schema({
   },
   visibility: {
     type: String,
-    enum: ['public', 'division'],
-    default: 'division'
+    enum: ['public', 'bootcamp'],
+    default: 'bootcamp'
   }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 

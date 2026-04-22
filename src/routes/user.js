@@ -9,7 +9,7 @@ import {
   deleteUser
 } from "../controllers/userController.js";
 import { authMiddleware } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
 
 const router = express.Router();
 
@@ -43,19 +43,19 @@ router.post("/setup", async (req, res) => {
 router.use(authMiddleware);
 
 // POST /users/promote
-router.post("/promote", authorizeRole("super-admin", "admin"), promoteUser);
+router.post("/promote", restrictTo("super-admin", "admin"), promoteUser);
 // PATCH /users/:id/promote
-router.patch("/:id/promote", authorizeRole("super-admin", "admin"), promoteUser);
+router.patch("/:id/promote", restrictTo("super-admin", "admin"), promoteUser);
 
 router
   .route("/")
-  .post(authorizeRole("super-admin", "admin"), createUser)
-  .get(authorizeRole("super-admin", "admin"), getUsers);
+  .post(restrictTo("super-admin", "admin"), createUser)
+  .get(restrictTo("super-admin", "admin"), getUsers);
 
 router.get("/me", getMe);
 
 router.get("/:id", getUser);
-router.put("/:id", authorizeRole("super-admin", "admin"), updateUser);
-router.delete("/:id", authorizeRole("super-admin"), deleteUser);
+router.put("/:id", restrictTo("super-admin", "admin"), updateUser);
+router.delete("/:id", restrictTo("super-admin"), deleteUser);
 
 export default router;

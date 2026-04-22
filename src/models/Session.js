@@ -10,9 +10,9 @@ const sessionSchema = new mongoose.Schema(
     description: {
       type: String,
     },
-    division: {
+    bootcamp: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Division",
+      ref: "Bootcamp",
       required: [true, "Division ID is required"],
     },
     instructor: {
@@ -39,6 +39,6 @@ const sessionSchema = new mongoose.Schema(
 );
 
 sessionSchema.index({ instructor: 1, startTime: 1, endTime: 1 });
-sessionSchema.index({ division: 1, startTime: 1, endTime: 1 });
+sessionSchema.index({ bootcamp: 1, startTime: 1, endTime: 1 });
 
 export default mongoose.model("Session", sessionSchema);

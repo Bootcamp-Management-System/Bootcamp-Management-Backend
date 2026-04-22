@@ -1,9 +1,9 @@
-import Division from "../models/Division.js";
+import Bootcamp from "../models/Bootcamp.js";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
 
 export const createSession = async (sessionData) => {
-  const { title, description, division, instructor, location, meetingLink, startTime, endTime } = sessionData;
+  const { title, description, bootcamp, instructor, location, meetingLink, startTime, endTime } = sessionData;
 
   if (!startTime || !endTime) {
     const err = new Error("Start and end times are required");
@@ -21,12 +21,13 @@ export const createSession = async (sessionData) => {
     throw err;
   }
 
-  const divisionExists = await Division.findById(division);
-  if (!divisionExists) {
-    const err = new Error("Division not found");
+  const bootcampExists = await Bootcamp.findById(bootcamp);
+  if (!bootcampExists) {
+    const err = new Error("Bootcamp not found");
     err.statusCode = 404;
     throw err;
   }
+  const divisionId = bootcampExists.division;
 
   if (instructor) {
     const instructorExists = await User.findById(instructor);
@@ -45,7 +46,7 @@ export const createSession = async (sessionData) => {
     if (instructorExists.role === "instructor") {
       const isAssignedToDivision = instructorExists.assignedDivisions
         .map((id) => id.toString())
-        .includes(division.toString());
+        .includes(divisionId.toString());
       if (!isAssignedToDivision) {
         const err = new Error("Instructor is not assigned to this division");
         err.statusCode = 400;
@@ -59,7 +60,7 @@ export const createSession = async (sessionData) => {
   };
 
   conflictQuery.$or.push({
-    division,
+    bootcamp,
     startTime: { $lt: end },
     endTime: { $gt: start }
   });
@@ -83,7 +84,7 @@ export const createSession = async (sessionData) => {
   const session = await Session.create({
     title,
     description,
-    division,
+    bootcamp,
     instructor,
     location,
     meetingLink,
@@ -97,8 +98,8 @@ export const createSession = async (sessionData) => {
 export const getSessions = async (user, queryData) => {
   const filter = {};
 
-  if (queryData.division) {
-    filter.division = queryData.division;
+  if (queryData.bootcamp) {
+    filter.bootcamp = queryData.bootcamp;
   }
 
   if (user.role === "instructor") {
@@ -107,7 +108,7 @@ export const getSessions = async (user, queryData) => {
 
   const sessions = await Session.find(filter)
     .populate("instructor", "email role")
-    .populate("division", "name");
+    .populate("bootcamp", "name");
   
   return sessions;
 };
@@ -129,7 +130,8 @@ export const updateSession = async (id, updateData) => {
       throw err;
     }
 
-    const sessionDivStr = sessionToUpdate.division.toString();
+    const sessionBootcamp = await Bootcamp.findById(sessionToUpdate.bootcamp);
+    const sessionDivStr = sessionBootcamp.division.toString();
     
     if (instructorExists.role === "admin" && instructorExists.division && instructorExists.division.toString() !== sessionDivStr) {
       const err = new Error("Admin does not belong to this division");

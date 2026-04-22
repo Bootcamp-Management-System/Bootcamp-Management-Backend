@@ -1,15 +1,17 @@
 import express from "express";
-import { submitFeedback, getFeedback, getSessionStats, updateFeedback } from "../controllers/feedbackController.js";
+import { submitFeedback, getFeedback, updateFeedback, getSessionStats } from "../controllers/feedbackController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
+import { bootcampGuard } from "../middlewares/bootcampGuard.js";
 
 const router = express.Router();
 
 router.use(protect);
+router.use(bootcampGuard); // 🔒 Only accepted students + staff
 
-router.post("/", authorizeRole("student"), submitFeedback);
-router.get("/", getFeedback);
-router.put("/:id", authorizeRole("student"), updateFeedback);
-router.get("/stats/:sessionId", authorizeRole("super-admin", "admin", "instructor"), getSessionStats);
+router.post("/", restrictTo("student"), submitFeedback);
+router.get("/", restrictTo("super-admin", "admin", "instructor", "student"), getFeedback);
+router.patch("/:id", restrictTo("student"), updateFeedback);
+router.get("/stats/:sessionId", restrictTo("super-admin", "admin", "instructor"), getSessionStats);
 
 export default router;

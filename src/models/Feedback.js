@@ -29,7 +29,7 @@ const feedbackSchema = new mongoose.Schema(
       required: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Prevent a student from rating the same session twice

@@ -1,34 +1,21 @@
 import express from "express";
-import {
-  createSession,
-  getSessions,
-  updateSession,
-  deleteSession,
-  assignInstructor
-} from "../controllers/sessionController.js";
-import { getResourcesBySession } from "../controllers/resourceController.js";
-import { authMiddleware } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
-import { checkDivisionAccess } from "../middlewares/roleBase/divisionMiddleware.js";
+import { createSession, getSessions, updateSession, deleteSession } from "../controllers/sessionController.js";
+import { authMiddleware as protect } from "../middlewares/auth.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
+import { checkDivisionAccess } from "../middlewares/divisionGuard.js";
+import { bootcampGuard } from "../middlewares/bootcampGuard.js";
 
 const router = express.Router();
 
-router.use(authMiddleware);
+router.use(protect);
+router.use(bootcampGuard); // 🔒 Only accepted students + staff
 
-router
-  .route("/")
-  .post(authorizeRole("super-admin", "admin"), checkDivisionAccess, createSession)
-  .get(checkDivisionAccess, getSessions);
+router.route("/")
+  .post(restrictTo("super-admin", "admin", "instructor"), checkDivisionAccess, createSession)
+  .get(getSessions);
 
-router
-  .route("/:id")
-  .put(authorizeRole("super-admin", "admin"), checkDivisionAccess, updateSession)
-  .delete(authorizeRole("super-admin", "admin"), checkDivisionAccess, deleteSession);
-
-router
-  .route("/:id/assign-instructor")
-  .patch(authorizeRole("super-admin", "admin"), checkDivisionAccess, assignInstructor);
-
-router.get("/:session_id/resources", checkDivisionAccess, getResourcesBySession);
+router.route("/:id")
+  .patch(restrictTo("super-admin", "admin", "instructor"), updateSession)
+  .delete(restrictTo("super-admin", "admin"), deleteSession);
 
 export default router;

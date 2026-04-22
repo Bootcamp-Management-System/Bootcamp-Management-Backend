@@ -1,16 +1,17 @@
 import express from "express";
-import { submitTask, reviewSubmission, getSubmissions, updateSubmission } from "../controllers/submissionController.js";
+import { submitTask, updateSubmission, reviewSubmission, getSubmissions } from "../controllers/submissionController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
+import { bootcampGuard } from "../middlewares/bootcampGuard.js";
 
 const router = express.Router();
 
 router.use(protect);
+router.use(bootcampGuard); // 🔒 Only accepted students + staff
 
-router.post("/submit", authorizeRole("student"), submitTask);
-router.post("/:taskId", authorizeRole("student"), submitTask);
-router.put("/:id", authorizeRole("student"), updateSubmission);
-router.patch("/review/:id", authorizeRole("super-admin", "admin", "instructor"), reviewSubmission);
-router.get("/", getSubmissions);
+router.post("/", restrictTo("student"), submitTask);
+router.get("/", restrictTo("super-admin", "admin", "instructor", "student"), getSubmissions);
+router.patch("/:id", restrictTo("student"), updateSubmission);
+router.patch("/:id/review", restrictTo("super-admin", "admin", "instructor"), reviewSubmission);
 
 export default router;

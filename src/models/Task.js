@@ -24,10 +24,10 @@ const taskSchema = new mongoose.Schema(
       required: [true, "Deadline is required"],
     },
 
-    division: {
+    bootcamp: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Division",
-      required: [true, "Task must belong to a division"],
+      ref: "Bootcamp",
+      required: [true, "Task must belong to a bootcamp"],
     },
     session: {
       type: mongoose.Schema.Types.ObjectId,
