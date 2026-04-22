@@ -1,10 +1,22 @@
 import * as taskService from "../services/taskService.js";
+import { notifyDivision } from "../services/notificationService.js";
 
 // @desc    Create a new task
 export const createTask = async (req, res) => {
   try {
     const task = await taskService.createTask(req.body, req.user);
     res.status(201).json({ success: true, data: task });
+
+    // Notify division members about the new task
+    notifyDivision({
+      senderId: req.user.id,
+      divisionId: task.division,
+      title: "New Task Assigned",
+      message: `A new task "${task.title}" has been assigned to your division. Deadline: ${new Date(task.deadline).toLocaleString()}`,
+      type: "task",
+      link: `/tasks/${task._id}`,
+      requester: req.user
+    }).catch(err => console.error("Notification Error:", err));
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
   }

@@ -5,7 +5,11 @@
  */
 export const checkDivisionAccess = (req, res, next) => {
   const { user } = req;
-  const targetDivisionId = req.params.divisionId || req.body.division || req.query.divisionId;
+  const targetDivisionId =
+    req.params.divisionId ||
+    req.query.divisionId ||
+    req.query.division ||
+    req.body?.division;
 
   if (user.role === 'super-admin') {
     return next();

@@ -4,6 +4,7 @@ import Session from "../models/Session.js";
 import path from "path";
 import fs from "fs";
 import * as resourceService from "../services/resourceService.js";
+import { notifyDivision } from "../services/notificationService.js";
 
 export const uploadResource = async (req, res) => {
   try {
@@ -66,6 +67,17 @@ export const uploadResource = async (req, res) => {
       resource_id: newResource._id,
       file_url: newResource.file_url,
     });
+
+    // Notify division members about the new resource
+    notifyDivision({
+      senderId: req.user.id,
+      divisionId: division_id,
+      title: "New Resource Uploaded",
+      message: `A new resource "${title}" has been uploaded to your division.`,
+      type: "info",
+      link: `/resources/${newResource._id}`,
+      requester: req.user
+    }).catch(err => console.error("Notification Error:", err));
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);

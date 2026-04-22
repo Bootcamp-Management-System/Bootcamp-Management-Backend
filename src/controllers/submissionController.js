@@ -1,5 +1,6 @@
 import Submission from "../models/Submission.js";
 import Task from "../models/Task.js";
+import { notifyUser, notifyDivision } from "../services/notificationService.js";
 
 const getUserDivisionId = (user) => {
   if (user?.division) return user.division;
@@ -70,6 +71,17 @@ export const submitTask = async (req, res) => {
     });
 
     res.status(201).json({ success: true, data: submission });
+
+    // Notify division instructors/admins about the new submission
+    notifyDivision({
+      senderId: req.user.id,
+      divisionId: taskDivisionId,
+      title: "New Task Submission",
+      message: `${req.user.email} has submitted the task: "${task.title}".`,
+      type: "info",
+      link: `/submissions/${submission._id}`,
+      requester: req.user
+    }).catch(err => console.error("Notification Error:", err));
   } catch (error) {
     if (error.code === 11000) {
        return res.status(400).json({ error: "You have already submitted this task" });
@@ -136,6 +148,16 @@ export const reviewSubmission = async (req, res) => {
     await submission.save();
 
     res.status(200).json({ success: true, data: submission });
+
+    // Notify student about the review
+    notifyUser({
+      senderId: req.user.id,
+      recipientId: submission.student,
+      title: "Submission Reviewed",
+      message: `Your submission for "${submission.task.title}" has been reviewed. Grade: ${grade || 'N/A'}.`,
+      type: "grading",
+      link: `/submissions/${submission._id}`
+    }).catch(err => console.error("Notification Error:", err));
   } catch (error) {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
