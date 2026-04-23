@@ -96,6 +96,35 @@ class EmailService {
     `;
     await this.sendEmail({ to: email, subject: "Application Status Update", html });
   }
+
+  // 6. Membership Acceptance (Post-Bootcamp)
+  static async sendMembershipAcceptance(email, divisionName) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 2px solid #2563eb; border-radius: 15px;">
+        <h2 style="color: #2563eb; text-align: center;">Welcome to the Family! 🎉</h2>
+        <p>Congratulations! You have been officially accepted as a **Member** of the <strong>${divisionName}</strong> Division!</p>
+        <p>You now have permanent access to the division resources and are eligible to be promoted as a Mentor/Instructor for future bootcamps.</p>
+        <div style="background: #eff6ff; padding: 15px; border-radius: 10px; margin: 20px 0;">
+           <p style="margin: 0;"><strong>Membership Status:</strong> ACTIVE</p>
+           <p style="margin: 0;"><strong>Division:</strong> ${divisionName}</p>
+        </div>
+        <p>Your dashboard has been updated with the Membership Nav Bar.</p>
+      </div>
+    `;
+    await this.sendEmail({ to: email, subject: `Welcome to the ${divisionName} Division Membership!`, html });
+  }
+
+  // 7. Membership Rejection
+  static async sendMembershipRejection(email, divisionName) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Membership Update</h2>
+        <p>Thank you for your dedication throughout the bootcamp and for completing the membership assessment for the ${divisionName} division.</p>
+        <p>While we appreciate your efforts, we have decided not to grant membership status at this time. We encourage you to keep building and applying your skills!</p>
+      </div>
+    `;
+    await this.sendEmail({ to: email, subject: "Update regarding your Membership Application", html });
+  }
 }
 
 export default EmailService;

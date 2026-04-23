@@ -11,6 +11,11 @@ const enrollmentSchema = new mongoose.Schema({
     ref: 'Bootcamp', 
     required: true 
   },
+  role: {
+    type: String,
+    enum: ['student', 'instructor'],
+    default: 'student'
+  },
   is_active: { 
     type: Boolean, 
     default: false 

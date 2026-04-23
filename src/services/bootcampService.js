@@ -1,25 +1,32 @@
 import Bootcamp from "../models/Bootcamp.js";
 
-export const createBootcampRepo = async (data, adminDivision, adminId) => {
-  return await Bootcamp.create({
-    ...data,
-    division: adminDivision,
-    createdBy: adminId
-  });
+export const createBootcamp = async (data, userId) => {
+  return await Bootcamp.create({ ...data, createdBy: userId });
 };
 
-export const getBootcampsRepo = async (filter) => {
-  return await Bootcamp.find(filter).populate('division', 'name code').populate('createdBy', 'name email');
+export const getBootcamps = async (filters = {}) => {
+  return await Bootcamp.find(filters).populate('division', 'name');
 };
 
-export const updateBootcampRepo = async (bootcampId, data, adminDivision) => {
-  const bootcamp = await Bootcamp.findById(bootcampId);
+export const getBootcampById = async (id) => {
+  const bootcamp = await Bootcamp.findById(id).populate('division');
   if (!bootcamp) throw new Error("Bootcamp not found");
-  
-  if (adminDivision && bootcamp.division.toString() !== adminDivision.toString()) {
-    throw new Error("You do not have permission to modify this bootcamp");
-  }
+  return bootcamp;
+};
 
-  Object.assign(bootcamp, data);
-  return await bootcamp.save();
+export const updateBootcamp = async (id, data) => {
+  const bootcamp = await Bootcamp.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+  if (!bootcamp) throw new Error("Bootcamp not found");
+  return bootcamp;
+};
+
+export const deleteBootcamp = async (id) => {
+  const bootcamp = await Bootcamp.findByIdAndDelete(id);
+  if (!bootcamp) throw new Error("Bootcamp not found");
+  return bootcamp;
+};
+
+// Public method for Landing Page
+export const getPublishedBootcamps = async () => {
+  return await Bootcamp.find({ isPublished: true }).populate('division', 'name description');
 };

@@ -74,12 +74,66 @@ export const createUser = async (userData, creatorUser) => {
       assignedDivisions: currentUserRole === 'admin'
         ? (creatorDivision ? [creatorDivision] : [])
         : (division ? [division] : []),
+      memberships: (division || creatorDivision) ? [{
+        division: division || creatorDivision,
+        isMember: role === 'admin' ? true : false,
+        isInstructor: role === 'admin' ? true : false
+      }] : [],
       is_Member: false,
       firstLogin: true,
-      verified: false
+      verified: false,
+      is_EmailVerified: true // Auto-verified if created by admin
     });
 
     return { user, tempPassword };
+  };
+
+  export const importMembers = async (membersList) => {
+    const results = [];
+    for (const member of membersList) {
+      const { email, name, divisions } = member;
+      
+      let user = await User.findOne({ email });
+      const tempPassword = crypto.randomBytes(8).toString("hex");
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+      if (!user) {
+        user = await User.create({
+          email,
+          name,
+          password: hashedPassword,
+          role: 'student',
+          is_Member: true,
+          is_EmailVerified: true,
+          firstLogin: true,
+          memberships: divisions.map(d => ({ division: d, isMember: true }))
+        });
+      } else {
+        // If user exists, update their membership status
+        user.is_Member = true;
+        divisions.forEach(divId => {
+          const existing = user.memberships.find(m => m.division.toString() === divId.toString());
+          if (existing) {
+            existing.isMember = true;
+          } else {
+            user.memberships.push({ division: divId, isMember: true });
+          }
+        });
+        await user.save();
+      }
+      results.push({ email, tempPassword: !user ? tempPassword : 'ALREADY_EXISTS' });
+    }
+    return results;
+  };
+
+  export const getMemberPool = async (query = {}) => {
+    // Return all users who are marked as members (global or division-specific)
+    return await User.find({ 
+      $or: [
+        { is_Member: true },
+        { "memberships.isMember": true }
+      ]
+    }).select("-password").populate("memberships.division", "name");
   };
 
   export const getUsers = async () => {
@@ -148,7 +202,7 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
 
   const oldRole = user.role;
 
-  // 1. Promote to Instructor
+  // 1. Promote to Instructor (Division Admin Action)
   if (newRole === 'instructor') {
     if (requester.role === 'super-admin') {
       const err = new Error("Only an Admin can promote a student to an instructor for their division.");
@@ -156,25 +210,7 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
       throw err;
     }
 
-    if (oldRole !== 'student') {
-      const err = new Error("Admins can only promote students to instructor.");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (!user.is_Member) {
-      const err = new Error("Cannot promote student: User is not marked as a verified member (is_Member = false).");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (!user.verified) {
-      const err = new Error("Cannot promote student: User has not verified their email.");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Admins assign the instructor to *their* division (multiple assignment)
+    // Admins assign the instructor to *their* division
     const adminDivision = requester.division;
     if (!adminDivision) {
       const err = new Error("Admin is not assigned to a division.");
@@ -182,19 +218,33 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
       throw err;
     }
 
-    // Determine if we need to reset the password, maybe not if they already verified their email?
-    // Let's keep the existing password.
+    // Find if user has membership in this division
+    let membership = user.memberships.find(m => m.division.toString() === adminDivision.toString());
     
+    if (!membership) {
+       // If not a member of this division, check if they are in the pool
+       if (!user.is_Member) {
+         const err = new Error("User must be an existing Member before being promoted to Instructor.");
+         err.statusCode = 400;
+         throw err;
+       }
+       // Add them to this division's membership list
+       user.memberships.push({ division: adminDivision, isMember: true, isInstructor: true });
+    } else {
+       if (!membership.isMember) {
+         const err = new Error("User is in this division but not yet a verified Member.");
+         err.statusCode = 400;
+         throw err;
+       }
+       membership.isInstructor = true;
+    }
+
+    // Switch their global role to instructor for dashboard access
     user.role = 'instructor';
     
-    // Add the admin's division to the instructor's assignedDivisions
+    // Add to legacy field for safety
     if (!user.assignedDivisions.includes(adminDivision)) {
       user.assignedDivisions.push(adminDivision);
-    }
-    
-    // Update primary division if it wasn't set
-    if (!user.division) {
-      user.division = adminDivision;
     }
 
     await user.save();
@@ -208,26 +258,31 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
       reason: reason || `Promoted to instructor in division ${adminDivision}`
     });
 
-    return { user, message: "Student promoted to instructor successfully!" };
+    return { user, message: "User promoted to instructor for your division!" };
   }
 
-  // 2. Promote to Admin
+  // 2. Promote to Admin (Super Admin Action)
   if (newRole === 'admin') {
     if (requester.role !== 'super-admin') {
-      const err = new Error("Only Super Admin can promote to Admin");
+      const err = new Error("Only Super Admin can promote a user to Division Admin.");
       err.statusCode = 403;
       throw err;
     }
 
-    if (['super-admin', 'admin'].includes(oldRole)) {
-      const err = new Error("User is already an admin");
+    if (!user.is_Member) {
+      const err = new Error("Only verified Members can be promoted to Division Admin. Please import them as members or accept their membership application first.");
       err.statusCode = 400;
       throw err;
     }
 
-    const finalDivisionId = divisionId || user.division;
-    if (!finalDivisionId) {
-      const err = new Error("User must be assigned to a division to be a division admin");
+    if (user.role === 'admin') {
+      const err = new Error("User is already an admin.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!divisionId) {
+      const err = new Error("You must specify the Division ID to which this admin will be assigned.");
       err.statusCode = 400;
       throw err;
     }
@@ -235,20 +290,29 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
     const tempPassRaw = crypto.randomBytes(8).toString('hex');
     const hashedTempPass = await bcrypt.hash(tempPassRaw, 10);
 
-    user.role = newRole;
-    user.division = finalDivisionId;
+    user.role = 'admin';
+    user.division = divisionId;
     user.firstLogin = true;
     user.password = hashedTempPass;
-    user.temporaryPassword = hashedTempPass;
+    
+    // Add/Update membership for this division
+    let membership = user.memberships.find(m => m.division.toString() === divisionId.toString());
+    if (membership) {
+      membership.isMember = true;
+      membership.isInstructor = true; // Admins are implicitly instructors for their division
+    } else {
+      user.memberships.push({ division: divisionId, isMember: true, isInstructor: true });
+    }
+
     await user.save();
 
     await RoleHistory.create({
       userId: user._id,
       previousRole: oldRole,
-      newRole: newRole,
+      newRole: 'admin',
       changedBy: requester._id,
-      divisionId: user.division,
-      reason: reason || "Promoted to division admin"
+      divisionId: divisionId,
+      reason: reason || `Promoted to Admin for division ${divisionId}`
     });
 
     return { user, tempPassRaw };

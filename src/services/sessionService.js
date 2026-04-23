@@ -31,27 +31,27 @@ export const createSession = async (sessionData) => {
 
   if (instructor) {
     const instructorExists = await User.findById(instructor);
-    if (!instructorExists || !["admin", "instructor"].includes(instructorExists.role)) {
-      const err = new Error("Invalid instructor/admin ID");
-      err.statusCode = 400;
+    if (!instructorExists) {
+      const err = new Error("Instructor not found");
+      err.statusCode = 404;
       throw err;
     }
 
-    if (instructorExists.role === "admin" && instructorExists.division && instructorExists.division.toString() !== division.toString()) {
-      const err = new Error("Admin does not belong to this division");
-      err.statusCode = 400;
+    // Check if user is an instructor in this division's memberships
+    const membership = instructorExists.memberships.find(m => m.division.toString() === divisionId.toString());
+    const isActuallyInstructor = membership && membership.isInstructor;
+    const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
+
+    if (!isActuallyInstructor && !isGlobalAdmin) {
+      const err = new Error("User is not a promoted instructor for this division");
+      err.statusCode = 403;
       throw err;
     }
 
-    if (instructorExists.role === "instructor") {
-      const isAssignedToDivision = instructorExists.assignedDivisions
-        .map((id) => id.toString())
-        .includes(divisionId.toString());
-      if (!isAssignedToDivision) {
-        const err = new Error("Instructor is not assigned to this division");
-        err.statusCode = 400;
-        throw err;
-      }
+    if (instructorExists.is_Mentoring) {
+      const err = new Error("Instructor is currently assigned to another active session (Conflict)");
+      err.statusCode = 409;
+      throw err;
     }
   }
 
@@ -92,6 +92,10 @@ export const createSession = async (sessionData) => {
     endTime: end,
   });
 
+  if (instructor) {
+    await User.findByIdAndUpdate(instructor, { is_Mentoring: true });
+  }
+
   return session;
 };
 
@@ -121,34 +125,34 @@ export const updateSession = async (id, updateData) => {
     throw err;
   }
 
-  // If instructor is being updated, validate division
-  if (updateData.instructor) {
+  // If instructor is being updated, validate division and mentoring status
+  if (updateData.instructor && updateData.instructor.toString() !== sessionToUpdate.instructor?.toString()) {
     const instructorExists = await User.findById(updateData.instructor);
-    if (!instructorExists || !["admin", "instructor"].includes(instructorExists.role)) {
-      const err = new Error("Invalid instructor/admin ID");
-      err.statusCode = 400;
-      throw err;
-    }
-
     const sessionBootcamp = await Bootcamp.findById(sessionToUpdate.bootcamp);
-    const sessionDivStr = sessionBootcamp.division.toString();
-    
-    if (instructorExists.role === "admin" && instructorExists.division && instructorExists.division.toString() !== sessionDivStr) {
-      const err = new Error("Admin does not belong to this division");
-      err.statusCode = 400;
+    const divisionId = sessionBootcamp.division;
+
+    const membership = instructorExists.memberships.find(m => m.division.toString() === divisionId.toString());
+    const isActuallyInstructor = membership && membership.isInstructor;
+    const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
+
+    if (!isActuallyInstructor && !isGlobalAdmin) {
+      const err = new Error("User is not a promoted instructor for this division");
+      err.statusCode = 403;
       throw err;
     }
 
-    if (instructorExists.role === "instructor") {
-      const isAssignedToDivision = instructorExists.assignedDivisions
-        .map((did) => did.toString())
-        .includes(sessionDivStr);
-      if (!isAssignedToDivision) {
-        const err = new Error("Instructor is not assigned to this division");
-        err.statusCode = 400;
-        throw err;
-      }
+    if (instructorExists.is_Mentoring) {
+      const err = new Error("Instructor is currently assigned to another active session (Conflict)");
+      err.statusCode = 409;
+      throw err;
     }
+
+    // Release old instructor
+    if (sessionToUpdate.instructor) {
+      await User.findByIdAndUpdate(sessionToUpdate.instructor, { is_Mentoring: false });
+    }
+    // Lock new instructor
+    await User.findByIdAndUpdate(updateData.instructor, { is_Mentoring: true });
   }
 
   const session = await Session.findByIdAndUpdate(id, updateData, {
@@ -160,13 +164,17 @@ export const updateSession = async (id, updateData) => {
 };
 
 export const deleteSession = async (id) => {
-  const session = await Session.findByIdAndDelete(id);
-
+  const session = await Session.findById(id);
   if (!session) {
     const err = new Error("Session not found");
     err.statusCode = 404;
     throw err;
   }
 
+  if (session.instructor) {
+    await User.findByIdAndUpdate(session.instructor, { is_Mentoring: false });
+  }
+
+  await Session.findByIdAndDelete(id);
   return session;
 };

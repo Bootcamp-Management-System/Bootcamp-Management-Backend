@@ -6,7 +6,9 @@ import {
   promoteUser,
   getUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  importMembers,
+  getMemberPool
 } from "../controllers/userController.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
@@ -46,6 +48,9 @@ router.use(authMiddleware);
 router.post("/promote", restrictTo("super-admin", "admin"), promoteUser);
 // PATCH /users/:id/promote
 router.patch("/:id/promote", restrictTo("super-admin", "admin"), promoteUser);
+
+router.post("/import-members", restrictTo("super-admin"), importMembers);
+router.get("/pool", restrictTo("super-admin", "admin"), getMemberPool);
 
 router
   .route("/")

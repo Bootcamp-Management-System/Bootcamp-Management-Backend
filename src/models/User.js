@@ -5,9 +5,22 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['super-admin', 'admin', 'instructor', 'student'], required: true },
+  
+  // New Membership-Centric Logic
+  memberships: [
+    {
+      division: { type: mongoose.Schema.Types.ObjectId, ref: 'Division' },
+      isMember: { type: Boolean, default: false },
+      isInstructor: { type: Boolean, default: false },
+      isMentoring: { type: Boolean, default: false }
+    }
+  ],
+  is_Member: { type: Boolean, default: false }, // Global flag: true if user is member of at least one division
+  is_Mentoring: { type: Boolean, default: false }, // Global lock for instructor assignments
+  
+  // Legacy Fields (kept for backward compatibility during migration)
   division: { type: mongoose.Schema.Types.ObjectId, ref: 'Division' },
   assignedDivisions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Division' }],
-  is_Member: { type: Boolean, default: false },
   
   // Recruitment Flow Flags
   is_EmailVerified: { type: Boolean, default: false },

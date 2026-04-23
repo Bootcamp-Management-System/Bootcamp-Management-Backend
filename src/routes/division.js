@@ -11,6 +11,9 @@ import { restrictTo } from "../middlewares/roleValidator.js";
 
 const router = express.Router();
 
+// Public Route for Landing Page
+router.get("/public", getDivisions);
+
 router.use(protect);
 
 router.route("/")

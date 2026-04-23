@@ -28,6 +28,16 @@ const bootcampSchema = new mongoose.Schema({
   createdBy: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
+  },
+  isPublished: { 
+    type: Boolean, 
+    default: false 
+  },
+  bannerImage: { 
+    type: String 
+  },
+  detailedHistory: { 
+    type: String 
   }
 }, { timestamps: true });
 

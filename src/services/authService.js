@@ -72,14 +72,19 @@ export const loginUser = async (email, password) => {
   const token = generateToken(user._id, user.tokenVersion || 0);
   const refreshToken = generateRefreshToken(user._id);
 
+  const isGlobalMember = user.memberships.some(m => m.isMember);
+  const isGlobalInstructor = user.memberships.some(m => m.isInstructor);
+
   return {
     token,
     refreshToken,
     user: { 
       id: user._id, 
       role: user.role, 
-      division: user.division,
-      name: user.name
+      name: user.name,
+      memberships: user.memberships,
+      isMember: isGlobalMember,
+      isInstructor: isGlobalInstructor
     }
   };
 };

@@ -38,6 +38,10 @@ const taskSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    isMembershipTask: {
+      type: Boolean,
+      default: false
+    }
   },
   { timestamps: true },
 );

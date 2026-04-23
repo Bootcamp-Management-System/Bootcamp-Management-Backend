@@ -1,5 +1,33 @@
 import * as userService from "../services/userService.js";
 
+// @desc    Bulk Import Members (Super Admin only)
+// @route   POST /api/v1/users/import-members
+// @access  Private/SuperAdmin
+export const importMembers = async (req, res) => {
+  try {
+    const { members } = req.body;
+    if (!members || !Array.isArray(members)) {
+      return res.status(400).json({ message: "Invalid members list format" });
+    }
+    const results = await userService.importMembers(members);
+    res.status(201).json({ success: true, data: results });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get Global Member Pool (Admins only)
+// @route   GET /api/v1/users/pool
+// @access  Private/Admin
+export const getMemberPool = async (req, res) => {
+  try {
+    const pool = await userService.getMemberPool();
+    res.status(200).json({ success: true, count: pool.length, data: pool });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Create new user (Admin/Super Admin only)
 // @route   POST /api/v1/users
 // @access  Private/Admin
