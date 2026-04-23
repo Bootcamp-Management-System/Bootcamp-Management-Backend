@@ -1,10 +1,13 @@
 import express from "express";
-import { submitFeedback, getFeedback, updateFeedback, getSessionStats } from "../controllers/feedbackController.js";
+import { submitFeedback, getFeedback, updateFeedback, getSessionStats, getPublicFeedback } from "../controllers/feedbackController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
 import { bootcampGuard } from "../middlewares/bootcampGuard.js";
 
 const router = express.Router();
+
+// Public Route
+router.get("/public", getPublicFeedback);
 
 router.use(protect);
 router.use(bootcampGuard); // 🔒 Only accepted students + staff

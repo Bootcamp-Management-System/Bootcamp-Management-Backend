@@ -157,3 +157,17 @@ export const getSessionStats = async (req, res) => {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
 };
+
+// @desc    Get curated feedback for landing page
+// @route   GET /api/v1/feedback/public
+export const getPublicFeedback = async (req, res) => {
+  try {
+    const feedback = await Feedback.find({ showOnLandingPage: true })
+      .populate("student", "name")
+      .populate("division", "name")
+      .limit(6);
+    res.status(200).json({ success: true, count: feedback.length, data: feedback });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

@@ -21,6 +21,7 @@ import enrollmentRoutes from "./routes/enrollment.js";
 import bootcampRoutes from "./routes/bootcamp.js";
 import membershipRoutes from "./routes/membership.js";
 import notificationRoutes from "./routes/notification.js";
+import successStoryRoutes from "./routes/successStory.js";
 
 dotenv.config({ path: "src/config/.env" });
 connectDB();
@@ -57,6 +58,7 @@ app.use("/api/v1/resources", resourceRoutes);
 app.use("/api/v1/enrollments", enrollmentRoutes);
 app.use("/api/v1/membership", membershipRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/success-stories", successStoryRoutes);
 
 app.get("/", (req, res) => {
   res.send("Bootcamp Management Backend Running 🚀");

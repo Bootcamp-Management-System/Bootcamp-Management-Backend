@@ -28,6 +28,10 @@ const feedbackSchema = new mongoose.Schema(
       ref: "Division",
       required: true,
     },
+    showOnLandingPage: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );
