@@ -1,6 +1,49 @@
 import Bootcamp from "../models/Bootcamp.js";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
+import Enrollment from "../models/Enrollment.js";
+import Notification from "../models/Notification.js";
+import EmailService from "./emailService.js";
+
+// Helper to notify students
+const notifyStudents = async (session) => {
+  const enrollments = await Enrollment.find({ bootcamp: session.bootcamp, is_active: true }).populate('student');
+  
+  const studentNotifications = enrollments.map(async (e) => {
+    const student = e.student;
+    // 1. In-App
+    await Notification.create({
+      user: student._id,
+      title: `New Session: ${session.title}`,
+      message: `A new session has been scheduled for ${new Date(session.startTime).toLocaleString()}.`,
+      type: "SESSION",
+      link: `/dashboard/sessions/${session._id}`
+    });
+
+    // 2. Email + Calendar
+    await EmailService.sendSessionNotification(student.email, session);
+  });
+
+  await Promise.all(studentNotifications);
+};
+
+// Helper to notify instructor
+const notifyInstructor = async (session) => {
+  if (!session.instructor) return;
+  const instructor = await User.findById(session.instructor);
+  
+  // 1. In-App
+  await Notification.create({
+    user: instructor._id,
+    title: `New Assignment: ${session.title}`,
+    message: `You have been assigned to lead the session "${session.title}" on ${new Date(session.startTime).toLocaleString()}.`,
+    type: "ASSIGNMENT",
+    link: `/dashboard/sessions/${session._id}`
+  });
+
+  // 2. Email + Calendar
+  await EmailService.sendInstructorAssignment(instructor.email, session);
+};
 
 export const createSession = async (sessionData) => {
   const { title, description, bootcamp, instructor, location, meetingLink, startTime, endTime } = sessionData;
@@ -96,6 +139,12 @@ export const createSession = async (sessionData) => {
     await User.findByIdAndUpdate(instructor, { is_Mentoring: true });
   }
 
+  // Trigger Notifications
+  notifyStudents(session).catch(err => console.error("Notification failed", err));
+  if (instructor) {
+    notifyInstructor(session).catch(err => console.error("Instructor Notification failed", err));
+  }
+
   return session;
 };
 
@@ -159,6 +208,11 @@ export const updateSession = async (id, updateData) => {
     new: true,
     runValidators: true,
   });
+
+  // If instructor was changed, notify the NEW instructor
+  if (updateData.instructor && updateData.instructor.toString() !== sessionToUpdate.instructor?.toString()) {
+     notifyInstructor(session).catch(err => console.error("Instructor Notification failed", err));
+  }
 
   return session;
 };

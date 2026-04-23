@@ -125,6 +125,94 @@ class EmailService {
     `;
     await this.sendEmail({ to: email, subject: "Update regarding your Membership Application", html });
   }
+
+  // 8. Session Invitation (For Students)
+  static async sendSessionNotification(email, session) {
+    const icsContent = this.generateICS(session);
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border-left: 5px solid #2563eb;">
+        <h2 style="color: #2563eb;">New Session Scheduled: ${session.title}</h2>
+        <p>A new session has been added to your bootcamp schedule.</p>
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+          <p><strong>Date:</strong> ${new Date(session.startTime).toLocaleString()}</p>
+          <p><strong>Link:</strong> <a href="${session.meetingLink}">${session.meetingLink}</a></p>
+          <p><strong>Description:</strong> ${session.description}</p>
+        </div>
+        <p>We have attached a calendar invite to this email. Open it to add this session to your Google or Outlook calendar.</p>
+      </div>
+    `;
+    
+    const mailOptions = {
+      to: email,
+      subject: `Upcoming Session: ${session.title}`,
+      html,
+      attachments: [{
+        filename: 'session.ics',
+        content: icsContent,
+        contentType: 'text/calendar'
+      }]
+    };
+    await this.sendEmail(mailOptions);
+  }
+
+  // 9. Instructor Assignment
+  static async sendInstructorAssignment(email, session) {
+    const icsContent = this.generateICS(session);
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border-left: 5px solid #10b981;">
+        <h2 style="color: #10b981;">Assignment Notification: ${session.title}</h2>
+        <p>You have been assigned as the **Lead Instructor** for the upcoming session.</p>
+        <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
+          <p><strong>Session:</strong> ${session.title}</p>
+          <p><strong>Time:</strong> ${new Date(session.startTime).toLocaleString()}</p>
+          <p><strong>Action Required:</strong> Please prepare your resources and ensure you are ready 10 minutes before start time.</p>
+        </div>
+        <p>Don't forget to generate the **Attendance QR Code** during the session!</p>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: `Teaching Assignment: ${session.title}`,
+      html,
+      attachments: [{
+        filename: 'assignment.ics',
+        content: icsContent,
+        contentType: 'text/calendar'
+      }]
+    });
+  }
+
+  // 10. Password Reset OTP
+  static async sendPasswordResetOTP(email, otp) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border-left: 5px solid #ef4444;">
+        <h2 style="color: #ef4444;">Password Reset Request</h2>
+        <p>We received a request to reset your password for the Bootcamp Management System.</p>
+        <div style="background: #fee2e2; padding: 15px; border-radius: 8px; font-size: 1.2rem; text-align: center;">
+          <p>Your 6-digit Reset Code is:</p>
+          <h1 style="letter-spacing: 5px; color: #b91c1c;">${otp}</h1>
+        </div>
+        <p>This code is valid for **10 minutes**. If you did not request this, please ignore this email and ensure your account is secure.</p>
+      </div>
+    `;
+    await this.sendEmail({ to: email, subject: "Password Reset Code", html });
+  }
+
+  static generateICS(session) {
+    const format = (d) => new Date(d).toISOString().replace(/-|:|\.\d+/g, '');
+    return `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTAMP:${format(new Date())}
+DTSTART:${format(session.startTime)}
+DTEND:${format(session.endTime)}
+SUMMARY:${session.title}
+DESCRIPTION:${session.description}
+LOCATION:${session.meetingLink || 'Virtual'}
+END:VEVENT
+END:VCALENDAR`;
+  }
 }
 
 export default EmailService;

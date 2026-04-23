@@ -115,3 +115,40 @@ export const logoutUser = async (userId) => {
   }
   return { message: "Logged out successfully" };
 };
+
+export const forgotPassword = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("No user found with this email address");
+
+  const resetOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.resetOTP = {
+    code: resetOtp,
+    expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
+  };
+  await user.save();
+
+  await EmailService.sendPasswordResetOTP(user.email, resetOtp);
+  return { success: true, message: "Password reset code sent to your email." };
+};
+
+export const resetPassword = async (email, otp, newPassword) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found");
+
+  if (!user.resetOTP || user.resetOTP.code !== otp || user.resetOTP.expiresAt < Date.now()) {
+    throw new Error("Invalid or expired reset code");
+  }
+
+  // Hash new password
+  user.password = await bcrypt.hash(newPassword, 12);
+  
+  // Clear reset OTP fields
+  user.resetOTP = undefined;
+  
+  // Increment token version to invalidate all current sessions for security
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  
+  await user.save();
+
+  return { success: true, message: "Password has been reset successfully. You can now log in with your new password." };
+};
