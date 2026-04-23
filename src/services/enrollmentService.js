@@ -1,25 +1,31 @@
 import Enrollment from "../models/Enrollment.js";
+import Bootcamp from "../models/Bootcamp.js";
 
-export const activateEnrollmentRepo = async (studentId, bootcampId, otp) => {
-  const enrollment = await Enrollment.findOne({ student: studentId, bootcamp: bootcampId });
-  if (!enrollment) throw new Error("Enrollment record not found for this bootcamp.");
+export const activateEnrollment = async (studentId, otpCode) => {
+  const enrollment = await Enrollment.findOne({ 
+    student: studentId, 
+    "enrollment_otp.code": otpCode 
+  });
 
-  if (enrollment.is_active) {
-    throw new Error("You are already enrolled and active in this bootcamp.");
+  if (!enrollment) {
+    throw new Error("Invalid or expired enrollment code.");
   }
 
-  if (!enrollment.enrollment_otp || enrollment.enrollment_otp.code !== otp || enrollment.enrollment_otp.expiresAt < Date.now()) {
-    throw new Error("Invalid or expired activation OTP.");
+  if (enrollment.enrollment_otp.expiresAt < new Date()) {
+    throw new Error("Enrollment code has expired. Please contact support.");
   }
 
   enrollment.is_active = true;
+  enrollment.enrollment_otp = undefined; // Clear OTP after success
   enrollment.activated_at = new Date();
-  enrollment.enrollment_otp = undefined; // Clear the OTP after successful use
+  
   await enrollment.save();
 
-  return enrollment;
+  return { success: true, message: "Bootcamp enrollment activated successfully!" };
 };
 
-export const getStudentActiveEnrollmentsRepo = async (studentId) => {
-  return await Enrollment.find({ student: studentId, is_active: true }).populate('bootcamp', 'name description');
+export const getMyEnrollments = async (studentId) => {
+  return await Enrollment.find({ student: studentId })
+    .populate('bootcamp', 'name startDate endDate bannerImage')
+    .sort('-createdAt');
 };
