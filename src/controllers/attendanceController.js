@@ -1,43 +1,78 @@
+import jwt from "jsonwebtoken";
 import Attendance from "../models/Attendance.js";
 import Session from "../models/Session.js";
 
-export const checkIn = async (req, res) => {
+// @desc    Generate a rotating 20-second token for attendance (Instructor only)
+// @route   GET /api/v1/attendance/qr-token/:sessionId
+export const generateAttendanceQR = async (req, res) => {
   try {
-    const { session: sessionId, note } = req.body;
-    const studentId = req.user.id;
-
-    if (!sessionId) return res.status(400).json({ error: "Session ID is required" });
-
+    const { sessionId } = req.params;
     const session = await Session.findById(sessionId);
+
     if (!session) return res.status(404).json({ error: "Session not found" });
 
+    // Check if requester is the assigned instructor or admin
+    const isGlobalAdmin = ["super-admin", "admin"].includes(req.user.role);
+    const isSessionInstructor = session.instructor?.toString() === req.user.id.toString();
+
+    if (!isGlobalAdmin && !isSessionInstructor) {
+      return res.status(403).json({ error: "Only the assigned instructor or admin can generate the attendance QR." });
+    }
+
+    // Generate short-lived token (expires in 20 seconds)
+    const token = jwt.sign(
+      { sessionId, type: "attendance_qr" },
+      process.env.JWT_QR_SECRET,
+      { expiresIn: "20s" }
+    );
+
+    res.status(200).json({ success: true, token });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// @desc    Mark attendance via QR Scan (Student)
+// @route   POST /api/v1/attendance/scan
+export const scanQRCode = async (req, res) => {
+  try {
+    const { token } = req.body;
+    const studentId = req.user.id;
+
+    if (!token) return res.status(400).json({ error: "QR Token is required" });
+
+    // 1. Verify Token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_QR_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Attendance code expired or invalid. Please scan the current code on the instructor screen." });
+    }
+
+    const { sessionId } = decoded;
+
+    // 2. Fetch Session
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: "Session no longer exists" });
+
+    // 3. Prevent Double Attendance
     const existingAttendance = await Attendance.findOne({ student: studentId, session: sessionId });
     if (existingAttendance) {
-      return res.status(409).json({ error: "Attendance already recorded for this session" });
+      return res.status(409).json({ error: "You have already been marked for this session" });
     }
 
-    const checkInTime = new Date();
-    const sessionStart = new Date(session.startTime);
-
-    const diffMs = checkInTime - sessionStart;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-
-    let status = "Present";
-    if (diffMins > 10) {
-      status = "Late";
-    }
-
+    // 4. Mark Present
     const attendance = await Attendance.create({
       student: studentId,
       session: sessionId,
-      checkInTime,
-      status,
-      note
+      checkInTime: new Date(),
+      status: "Present",
+      note: "Marked via Secure QR Scan"
     });
 
-    res.status(201).json({ success: true, data: attendance });
+    res.status(201).json({ success: true, message: "Attendance marked successfully!", data: attendance });
   } catch (error) {
-    res.status(500).json({ error: "Server Error", message: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
