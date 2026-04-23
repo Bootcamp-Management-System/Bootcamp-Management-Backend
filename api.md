@@ -1,108 +1,165 @@
 # Bootcamp Management API Reference
 
-This file documents the current API surface based on the live routes in `src/routes/` and controllers in `src/controllers/`.
-
 Base URL: `http://localhost:5000/api/v1`
 
-Common response shape:
-- Success responses usually return `{ success: true, ... }`
-- Errors usually return `{ message: "..." }` or `{ error: "...", message: "..." }`
+---
 
-## Landing Page (Public)
-
-### GET `/bootcamps/public`
-- Access: Public
-- Description: Fetches all published bootcamps for the landing page.
-- Response: `200 OK` with `{ success: true, data: bootcamps[] }`
-
-### GET `/bootcamps/public/:id`
-- Access: Public
-- Description: Fetches details of a specific bootcamp for the landing page.
-- Response: `200 OK` with `{ success: true, data: bootcamp }`
-
-### GET `/divisions/public`
-- Access: Public
-- Description: Fetches list of divisions for the landing page.
-- Response: `200 OK` with `{ success: true, count, data: divisions[] }`
-
-## Authentication
-
+## 🔑 1. Authentication
 ### POST `/auth/signup`
-- Access: Public
-- Description: Open signup for new students.
-- Body:
+- **Body:**
   ```json
   {
     "email": "student@example.com",
-    "password": "password123",
+    "password": "Password123!",
     "name": "Jane Doe"
   }
   ```
 
 ### POST `/auth/login`
-- Access: Public
-- Body (`req.body`):
+- **Body:**
   ```json
   {
     "email": "user@example.com",
-    "password": "password123"
+    "password": "Password123!"
   }
   ```
-- Response:
-  - `200 OK` with `{ success: true, token, refreshToken, user }`
-  - Note: `user` object includes `memberships`, `isMember`, and `isInstructor` helper flags.
+- **Response:** `{ "token": "...", "refreshToken": "...", "user": { "role": "student", "isMember": false } }`
 
-### POST `/auth/verify-otp`
-- Access: Public
-- Body (`req.body`):
+### POST `/auth/forgot-password`
+- **Body:** `{ "email": "user@example.com" }`
+
+### POST `/auth/reset-password`
+- **Body:**
   ```json
   {
     "email": "user@example.com",
     "otp": "123456",
-    "newPassword": "newSecurePassword123"
+    "newPassword": "NewSecurePassword!"
   }
   ```
 
-## Bootcamps (Protected)
+---
 
-### POST `/bootcamps`
-- Access: Super Admin / Admin
-- Body: `{ name, division, description, startDate, endDate, status, isPublished }`
-
-### GET `/bootcamps`
-- Access: Authenticated
-
-## Users & Memberships
-
-### POST `/users/import-members`
-- Access: Super Admin
-- Body: `{ members: [{ email, name, divisions: [id] }] }`
-
-### GET `/users/pool`
-- Access: Super Admin / Admin
-- Description: Search globally for verified members (`is_Member = true`).
-
-### PATCH `/users/:id/promote`
-- Access: Super Admin / Admin
-- Description: Promote a Member to Instructor (Admin) or a Member to Admin (Super Admin).
-
-## Membership Decisions
-
-### GET `/membership/candidates/:bootcampId`
-- Access: Admin
-- Description: Get students who applied for membership at the end of a bootcamp.
-
-### PATCH `/membership/decision`
-- Access: Admin
-- Body: `{ studentId, bootcampId, decision: "MEMBER" | "REJECT" }`
-
-## Recruitment & Applications
-
+## 🚀 2. Recruitment & Enrollment
 ### POST `/recruitment/apply`
-- Access: Authenticated (Student)
-- Body: `{ bootcampId, phase1Answers: [] }`
+- **Body:**
+  ```json
+  {
+    "bootcampId": "ID_HERE",
+    "phase1Answers": {
+      "why_join": "I love coding",
+      "experience": "Beginner"
+    }
+  }
+  ```
 
-### GET `/recruitment/template/:bootcampId`
-- Access: Authenticated
+### PATCH `/recruitment/decide/:applicationId`
+- **Body:**
+  ```json
+  {
+    "decision": "ACCEPT", 
+    "note": "Great technical skills shown."
+  }
+  ```
+  *(Decisions: `PASS`, `WAIT`, `REJECT`, `ACCEPT`)*
 
-... (See legacy sections for Tasks, Submissions, Resources, and Sessions)
+### POST `/enrollments/activate`
+- **Body:** `{ "otp": "123456" }`
+- **Description:** Uses the code from the Acceptance Email to activate classroom access.
+
+---
+
+## 📅 3. Sessions & Attendance
+### POST `/sessions`
+- **Body:**
+  ```json
+  {
+    "title": "React Hooks Deep Dive",
+    "bootcamp": "BOOTCAMP_ID",
+    "instructor": "USER_ID",
+    "startTime": "2026-05-01T10:00:00Z",
+    "endTime": "2026-05-01T12:00:00Z",
+    "meetingLink": "https://zoom.us/j/..."
+  }
+  ```
+
+### GET `/attendance/qr-token/:sessionId`
+- **Response:** `{ "token": "EYJ..." }` (20-second validity)
+
+### POST `/attendance/scan`
+- **Body:** `{ "token": "TOKEN_FROM_QR" }`
+
+### PATCH `/attendance/manual-override`
+- **Body:**
+  ```json
+  {
+    "studentId": "ID",
+    "sessionId": "ID",
+    "status": "PRESENT",
+    "note": "Medical excuse"
+  }
+  ```
+
+---
+
+## 📂 4. Tasks, Submissions & Feedback
+### POST `/tasks`
+- **Body:**
+  ```json
+  {
+    "title": "Build a Portfolio",
+    "description": "Use HTML/CSS",
+    "session": "SESSION_ID",
+    "dueDate": "2026-05-10"
+  }
+  ```
+
+### POST `/submissions`
+- **Body:**
+  ```json
+  {
+    "task": "TASK_ID",
+    "content": "https://github.com/user/portfolio",
+    "note": "Added some animations"
+  }
+  ```
+
+### POST `/feedback`
+- **Body:**
+  ```json
+  {
+    "sessionId": "ID",
+    "rating": 5,
+    "comment": "Amazing session, very clear!"
+  }
+  ```
+
+---
+
+## 🏠 5. Landing Page (Public)
+### GET `/bootcamps/public`
+### GET `/divisions/public`
+### GET `/feedback/public`
+- **Response:** List of curated testimonials where `showOnLandingPage: true`.
+
+### GET `/success-stories/public`
+- **Response:**
+  ```json
+  [
+    {
+      "studentName": "Alex",
+      "story": "Started with zero knowledge...",
+      "achievement": "Dev at Microsoft",
+      "bootcamp": { "name": "Fullstack Bootcamp" }
+    }
+  ]
+  ```
+
+---
+
+## 🔔 6. Notifications
+### GET `/notifications`
+- **Response:** `{ "data": [ { "title": "New Assignment", "message": "...", "isRead": false } ] }`
+
+### PATCH `/notifications/:id/read`
+- **Description:** Mark an alert as read.
