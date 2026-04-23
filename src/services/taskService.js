@@ -11,6 +11,18 @@ export const createTask = async (taskData, creator) => {
       err.statusCode = 404;
       throw err;
     }
+    
+    // Contextual Permission Check
+    const isSuperAdmin = creator.role === 'super-admin';
+    const isAdminOfDivision = creator.role === 'admin' && creator.division?.toString() === sessionData.division?.toString();
+    const isSessionInstructor = sessionData.instructor?.toString() === creator.id.toString();
+
+    if (!isSuperAdmin && !isAdminOfDivision && !isSessionInstructor) {
+      const err = new Error("You do not have permission to post a task for this session. Only the assigned instructor or division admin can do this.");
+      err.statusCode = 403;
+      throw err;
+    }
+
     if (sessionData.bootcamp.toString() !== bootcamp.toString()) {
       const err = new Error("Session does not belong to the specified bootcamp");
       err.statusCode = 400;

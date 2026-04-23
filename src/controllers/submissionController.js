@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Submission from "../models/Submission.js";
 import Task from "../models/Task.js";
 
@@ -120,12 +121,26 @@ export const reviewSubmission = async (req, res) => {
     const submission = await Submission.findById(req.params.id).populate("task");
     if (!submission) return res.status(404).json({ error: "Submission not found" });
 
-    // RBAC check: Reviewer must be in the same division
-     const reviewerDivisionId = getUserDivisionId(req.user);
-     if (req.user.role === 'admin' && !userHasDivisionAccess(req.user, submission.task.division)) {
-       return res.status(403).json({ error: "You can only review submissions in your division" });
+    // Contextual Permission Check
+    const task = submission.task;
+    const isGlobalAdmin = ['super-admin', 'admin'].includes(req.user.role);
+    let isSessionInstructor = false;
+
+    if (task.session) {
+       // Need to fetch session to check instructor
+       const Session = mongoose.model('Session');
+       const session = await Session.findById(task.session);
+       isSessionInstructor = session?.instructor?.toString() === req.user.id.toString();
     }
-    // Instructors might have more granular checks (if assigned) - for now keep it simple
+
+    if (!isGlobalAdmin && !isSessionInstructor) {
+       return res.status(403).json({ error: "You do not have permission to review this submission. Only the assigned instructor or division admin can do this." });
+    }
+
+    // Admin Division Check
+    if (req.user.role === 'admin' && !userHasDivisionAccess(req.user, task.division)) {
+       return res.status(403).json({ error: "Admins can only review submissions in their own division" });
+    }
 
     submission.status = status;
     submission.feedback = feedback;

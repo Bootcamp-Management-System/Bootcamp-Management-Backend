@@ -32,18 +32,25 @@ export const uploadResource = async (req, res) => {
       }
     }
 
-    // Role-based Access Control for Uploads
-    if (userRole === "admin" || userRole === "instructor") {
-      // Must be same division for admin or instructor
-      if (req.user.division && req.user.division.toString() !== division_id.toString()) {
-         // Cleanup uploaded file since they shouldn't have uploaded it here
-         fs.unlinkSync(req.file.path);
-         return res.status(403).json({ message: "You can only upload resources to your assigned division" });
-      }
-    } else if (userRole !== "super-admin") {
-      // Default students/others block
-      fs.unlinkSync(req.file.path);
-      return res.status(403).json({ message: "You do not have permission to upload resources" });
+    // Role-based Access Control for Uploads (Contextual)
+    const isGlobalAdmin = ["super-admin", "admin"].includes(userRole);
+    let isSessionInstructor = false;
+
+    if (session_id) {
+       const session = await Session.findById(session_id);
+       isSessionInstructor = session?.instructor?.toString() === req.user.id.toString();
+    }
+
+    if (!isGlobalAdmin && !isSessionInstructor) {
+       // If not admin and not the specific instructor for this session, block.
+       fs.unlinkSync(req.file.path);
+       return res.status(403).json({ message: "You do not have permission to upload resources. Only assigned instructors or admins can do this." });
+    }
+
+    // Admin Division Check
+    if (userRole === "admin" && req.user.division && req.user.division.toString() !== division_id.toString()) {
+       fs.unlinkSync(req.file.path);
+       return res.status(403).json({ message: "Admins can only upload resources to their assigned division" });
     }
 
     const file_type = path.extname(req.file.originalname).toLowerCase().replace('.', '');

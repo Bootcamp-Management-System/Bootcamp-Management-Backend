@@ -68,11 +68,20 @@ export const getFeedback = async (req, res) => {
 
     if (user.role === 'student') {
       filter.student = user.id;
-    } else if (user.role === 'instructor') {
-      // Find sessions where this user is the instructor
+    } else if (user.role === 'instructor' || user.role === 'student') {
+      // Find ALL sessions where this user is the instructor (Contextual Instructor)
       const sessions = await Session.find({ instructor: user.id });
       const sessionIds = sessions.map(s => s._id);
-      filter.session = { $in: sessionIds };
+      
+      if (user.role === 'student') {
+        // Students see their own feedback AND feedback for sessions they instruct
+        filter.$or = [
+          { student: user.id },
+          { session: { $in: sessionIds } }
+        ];
+      } else {
+        filter.session = { $in: sessionIds };
+      }
     } else if (user.role === 'admin') {
       if (user.division) {
         filter.division = user.division;
@@ -119,8 +128,21 @@ export const updateFeedback = async (req, res) => {
 // @desc    Get feedback summary (Average Rating) for a session
 export const getSessionStats = async (req, res) => {
   try {
+    const { sessionId } = req.params;
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Permission Check
+    const isSuperAdmin = req.user.role === 'super-admin';
+    const isAdminOfDivision = req.user.role === 'admin' && userHasDivisionAccess(req.user, session.division);
+    const isSessionInstructor = session.instructor?.toString() === req.user.id.toString();
+
+    if (!isSuperAdmin && !isAdminOfDivision && !isSessionInstructor) {
+      return res.status(403).json({ error: "Access denied. Only the instructor or division admin can see feedback stats." });
+    }
+
     const stats = await Feedback.aggregate([
-      { $match: { session: new mongoose.Types.ObjectId(req.params.sessionId) } },
+      { $match: { session: new mongoose.Types.ObjectId(sessionId) } },
       {
         $group: {
           _id: "$session",
