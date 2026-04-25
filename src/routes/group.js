@@ -13,10 +13,10 @@ router.use(protect);
 
 router.route("/")
     .get(getGroups)
-    .post(authorize("admin", "super_admin"), createGroup);
+    .post(authorize("admin"), createGroup);
 
 router.route("/:id")
-    .put(authorize("admin", "super_admin"), updateGroup)
-    .delete(authorize("admin", "super_admin"), deleteGroup);
+    .put(authorize("admin"), updateGroup)
+    .delete(authorize("admin"), deleteGroup);
 
 export default router;
