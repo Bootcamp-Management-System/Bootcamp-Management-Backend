@@ -11,7 +11,15 @@ export const createBootcamp = async (req, res) => {
 
 export const getBootcamps = async (req, res) => {
   try {
-    const bootcamps = await bootcampService.getBootcamps(req.query);
+    const filter = {};
+    
+    // Regular admins are restricted to their division
+    // Super-admins (Master Admins) bypass this filter
+    if (req.user.role === 'admin') {
+      filter.division = req.user.division;
+    }
+
+    const bootcamps = await bootcampService.getBootcamps(filter);
     res.status(200).json({ success: true, count: bootcamps.length, data: bootcamps });
   } catch (error) {
     res.status(500).json({ message: error.message });

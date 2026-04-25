@@ -1,27 +1,28 @@
-import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
-import helmet from "helmet";
+import dotenv from "dotenv";
+import express from "express";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import path from "path";
 import connectDB from "./config/db.js";
 
 // Routes
-import authRoutes from "./routes/auth.js";
-import userRoutes from "./routes/user.js";
-import divisionRoutes from "./routes/division.js";
-import recruitmentRoutes from "./routes/recruitment.js";
-import sessionRoutes from "./routes/session.js";
 import attendanceRoutes from "./routes/attendance.js";
-import taskRoutes from "./routes/task.js";
-import submissionRoutes from "./routes/submission.js";
-import feedbackRoutes from "./routes/feedback.js";
-import resourceRoutes from "./routes/resource.js";
-import enrollmentRoutes from "./routes/enrollment.js";
+import authRoutes from "./routes/auth.js";
 import bootcampRoutes from "./routes/bootcamp.js";
+import divisionRoutes from "./routes/division.js";
+import enrollmentRoutes from "./routes/enrollment.js";
+import feedbackRoutes from "./routes/feedback.js";
 import membershipRoutes from "./routes/membership.js";
 import notificationRoutes from "./routes/notification.js";
+import recruitmentRoutes from "./routes/recruitment.js";
+import resourceRoutes from "./routes/resource.js";
+import sessionRoutes from "./routes/session.js";
+import submissionRoutes from "./routes/submission.js";
 import successStoryRoutes from "./routes/successStory.js";
+import taskRoutes from "./routes/task.js";
+import userRoutes from "./routes/user.js";
+import groupRoutes from "./routes/group.js";
 
 dotenv.config({ path: "src/config/.env" });
 connectDB();
@@ -58,6 +59,7 @@ app.use("/api/v1/resources", resourceRoutes);
 app.use("/api/v1/enrollments", enrollmentRoutes);
 app.use("/api/v1/membership", membershipRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/groups", groupRoutes);
 app.use("/api/v1/success-stories", successStoryRoutes);
 
 app.get("/", (req, res) => {

@@ -34,8 +34,16 @@ export const signupUser = async (userData) => {
     otp: { code: otpCode, expiresAt: Date.now() + 15 * 60 * 1000 }
   });
 
-  await EmailService.sendVerificationEmail(user.email, otpCode);
-  return { message: "Signup successful. Please check your email for the verification OTP." };
+  try {
+    await EmailService.sendVerificationEmail(user.email, otpCode);
+  } catch (error) {
+    console.warn('⚠️ Email Service Error: OTP could not be sent. For development, use this code:', otpCode);
+  }
+
+  return { 
+    message: "Signup successful. Please verify your email to continue.",
+    otpCode: process.env.NODE_ENV === 'development' ? otpCode : undefined // Expose OTP in dev mode for easy testing
+  };
 };
 
 export const verifyOtp = async (email, otp, newPassword) => {
