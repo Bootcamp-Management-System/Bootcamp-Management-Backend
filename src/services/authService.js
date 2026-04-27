@@ -17,10 +17,15 @@ const generateRefreshToken = (id) => {
 };
 
 export const signupUser = async (userData) => {
-  const { email, password, name } = userData;
+  const { email, password, name, campusId, motivation, dedication, division } = userData;
   
   const existingUser = await User.findOne({ email });
   if (existingUser) throw new Error("Email already registered");
+
+  if (campusId) {
+    const existingId = await User.findOne({ campusId });
+    if (existingId) throw new Error("Campus ID already registered");
+  }
 
   const hashedPassword = await bcrypt.hash(password, 12);
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -29,6 +34,10 @@ export const signupUser = async (userData) => {
     email,
     password: hashedPassword,
     name,
+    campusId,
+    motivation,
+    dedication,
+    division,
     role: 'student',
     is_EmailVerified: false,
     otp: { code: otpCode, expiresAt: Date.now() + 15 * 60 * 1000 }
@@ -61,14 +70,27 @@ export const verifyOtp = async (email, otp, newPassword) => {
   user.otp = undefined;
   user.is_EmailVerified = true;
   user.verified = true; // backward compatibility
-  user.firstLogin = false;
   await user.save();
 
-  return { message: "Account verified successfully. You can now log in." };
+  const token = generateToken(user._id, user.tokenVersion || 0);
+  const refreshToken = generateRefreshToken(user._id);
+
+  return { 
+    message: "Account verified successfully.",
+    token,
+    refreshToken,
+    user: { 
+      id: user._id, 
+      role: user.role, 
+      name: user.name,
+      division: user.division,
+      firstLogin: user.firstLogin
+    }
+  };
 };
 
 export const loginUser = async (email, password) => {
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).populate('division');
   if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new Error("Invalid email or password");
   }
@@ -90,9 +112,11 @@ export const loginUser = async (email, password) => {
       id: user._id, 
       role: user.role, 
       name: user.name,
+      division: user.division,
       memberships: user.memberships,
       isMember: isGlobalMember,
-      isInstructor: isGlobalInstructor
+      isInstructor: isGlobalInstructor,
+      firstLogin: user.firstLogin
     }
   };
 };
@@ -112,7 +136,7 @@ export const googleLogin = async (googleToken) => {
   }
   const token = generateToken(user._id, user.tokenVersion || 0);
   const refreshToken = generateRefreshToken(user._id);
-  return { token, refreshToken, user: { id: user._id, role: user.role } };
+  return { token, refreshToken, user: { id: user._id, role: user.role, firstLogin: user.firstLogin } };
 };
 
 export const logoutUser = async (userId) => {

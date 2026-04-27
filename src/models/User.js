@@ -5,6 +5,9 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['super-admin', 'admin', 'instructor', 'student'], required: true },
+  campusId: { type: String, unique: true, sparse: true }, // Optional for admins, required for students (enforced in logic)
+  motivation: { type: String },
+  dedication: { type: String },
   
   // New Membership-Centric Logic
   memberships: [

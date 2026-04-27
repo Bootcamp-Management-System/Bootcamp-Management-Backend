@@ -8,7 +8,8 @@ import {
   updateUser,
   deleteUser,
   importMembers,
-  getMemberPool
+  getMemberPool,
+  completeOnboarding
 } from "../controllers/userController.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
@@ -31,6 +32,7 @@ router.post("/setup", async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await User.create({
+    name: "Super Admin",
     email,
     password: hashedPassword,
     role: "super-admin",
@@ -58,6 +60,7 @@ router
   .get(restrictTo("super-admin", "admin"), getUsers);
 
 router.get("/me", getMe);
+router.post("/onboarding", completeOnboarding);
 
 router.get("/:id", getUser);
 router.put("/:id", restrictTo("super-admin", "admin"), updateUser);

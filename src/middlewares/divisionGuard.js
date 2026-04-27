@@ -5,9 +5,9 @@
  */
 export const checkDivisionAccess = (req, res, next) => {
   const { user } = req;
-  const targetDivisionId = req.params.divisionId || req.body.division || req.query.divisionId;
+  const targetDivisionId = req.params.divisionId || req.body?.division || req.query?.divisionId;
 
-  if (user.role === 'super-admin') {
+  if (user.role === 'super-admin' || user.role === 'super_admin') {
     return next();
   }
 
@@ -22,8 +22,8 @@ export const checkDivisionAccess = (req, res, next) => {
     }
 
     // Inject the user's division into the request body/query for automatic filtering in controllers
-    req.query.division = user.division;
-    req.body.division = user.division;
+    if (req.query) req.query.division = user.division;
+    if (req.body) req.body.division = user.division;
     
     return next();
   }

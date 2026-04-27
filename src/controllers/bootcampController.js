@@ -2,9 +2,22 @@ import * as bootcampService from "../services/bootcampService.js";
 
 export const createBootcamp = async (req, res) => {
   try {
-    const bootcamp = await bootcampService.createBootcamp(req.body, req.user.id);
+    if (req.user.role === 'admin') {
+      if (!req.user.division) {
+        return res.status(403).json({ message: "Admin is not assigned to a division." });
+      }
+      req.body.division = req.user.division;
+    } else if (!req.body.division && (req.user.role === 'super-admin' || req.user.role === 'super_admin')) {
+      return res.status(400).json({ message: "Super Admin must specify a division." });
+    }
+
+    const bootcamp = await bootcampService.createBootcamp(req.body, req.user._id);
     res.status(201).json({ success: true, data: bootcamp });
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: Object.values(error.errors).map(val => val.message).join(', ') });
+    }
+    console.error("BOOTCAMP CREATE ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };

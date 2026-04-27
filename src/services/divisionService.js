@@ -1,5 +1,6 @@
 import Division from "../models/Division.js";
 import User from "../models/User.js";
+import * as userService from "./userService.js";
 
 export const createDivision = async (divisionData) => {
   const { name, description, instructors } = divisionData;
@@ -100,4 +101,29 @@ export const getUsersByDivision = async (divisionId) => {
     "_id name email role division"
   );
   return users;
+};
+
+export const assignDivisionAdmin = async ({ divisionId, userId, requester }) => {
+  const division = await Division.findById(divisionId);
+  if (!division) {
+    const err = new Error("Division not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const promotion = await userService.promoteUser(
+    userId,
+    { newRole: "admin", divisionId },
+    requester
+  );
+
+  // Track division admins in Division.instructors for existing frontend expectations.
+  await Division.findByIdAndUpdate(
+    divisionId,
+    { $addToSet: { instructors: promotion.user._id } },
+    { new: true }
+  );
+
+  const updatedDivision = await Division.findById(divisionId).populate("instructors", "email role name");
+  return { division: updatedDivision, promotedUser: promotion.user, tempPassword: promotion.tempPassRaw };
 };

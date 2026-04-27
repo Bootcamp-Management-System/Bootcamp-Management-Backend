@@ -24,7 +24,7 @@ import taskRoutes from "./routes/task.js";
 import userRoutes from "./routes/user.js";
 import groupRoutes from "./routes/group.js";
 
-dotenv.config({ path: "src/config/.env" });
+dotenv.config();
 connectDB();
 
 const app = express();
@@ -36,7 +36,7 @@ app.use(express.json());
 // Rate limiting for security
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // Increased for testing, should be lower in prod
+  max: 100, // Increased to 100 for development testing
   message: "Too many login attempts, please try again after 15 minutes",
 });
 app.use("/api/v1/auth/login", loginLimiter);

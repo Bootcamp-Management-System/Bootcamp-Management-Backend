@@ -63,9 +63,9 @@ const applicationSchema = new mongoose.Schema({
 
   bootcamp_id_issued: { type: String }
 
-}, { timestamps: true });
+}, { timestamps: true, autoIndex: false });
 
 // One application per student per bootcamp
-applicationSchema.index({ student: 1, bootcamp: 1 }, { unique: true });
+// applicationSchema.index({ student: 1, bootcamp: 1 }, { unique: true });
 
 export default mongoose.model('Application', applicationSchema);

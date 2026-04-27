@@ -4,7 +4,8 @@ import {
   getDivisions, 
   updateDivision, 
   deleteDivision, 
-  getUsersByDivision 
+  getUsersByDivision,
+  assignDivisionAdmin
 } from "../controllers/divisionController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
@@ -25,5 +26,11 @@ router.route("/:id")
   .delete(restrictTo("super-admin"), deleteDivision);
 
 router.get("/:divisionId/users", restrictTo("super-admin", "admin"), getUsersByDivision);
+
+router.post(
+  "/:divisionId/assign-admin",
+  restrictTo("super-admin"),
+  assignDivisionAdmin
+);
 
 export default router;

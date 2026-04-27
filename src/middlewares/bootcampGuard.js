@@ -3,7 +3,7 @@ import Enrollment from "../models/Enrollment.js";
 // @desc    Middleware to ensure only accepted students or authorized staff can access bootcamp-specific data
 export const bootcampGuard = async (req, res, next) => {
   const { user } = req;
-  const bootcampId = req.params.bootcampId || req.query.bootcamp || req.body.bootcamp;
+  const bootcampId = req.params.bootcampId || req.query.bootcamp || req.body?.bootcamp;
 
   // 1. Super Admins always have access
   if (user.role === 'super-admin') return next();

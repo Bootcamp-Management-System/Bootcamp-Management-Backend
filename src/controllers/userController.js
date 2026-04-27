@@ -54,7 +54,14 @@ export const createUser = async (req, res) => {
 // @access  Public (for now) / Admin
 export const getUsers = async (req, res) => {
   try {
-    const users = await userService.getUsers();
+    const filters = {};
+    if (req.user && req.user.role === 'admin') {
+      filters.$or = [
+        { division: req.user.division },
+        { "memberships.division": req.user.division }
+      ];
+    }
+    const users = await userService.getUsers(filters);
     res.status(200).json({
       success: true,
       count: users.length,
@@ -114,6 +121,18 @@ export const updateUser = async (req, res) => {
   try {
     const user = await userService.updateUser(req.params.id, req.body);
     res.status(200).json({ success: true, message: "User updated successfully", data: user });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
+  }
+};
+
+// @desc    Complete onboarding (First login question)
+// @route   POST /api/v1/users/onboarding
+// @access  Private
+export const completeOnboarding = async (req, res) => {
+  try {
+    const user = await userService.completeOnboarding(req.user._id, req.body);
+    res.status(200).json({ success: true, message: "Onboarding completed", data: user });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
   }

@@ -136,8 +136,12 @@ export const createUser = async (userData, creatorUser) => {
     }).select("-password").populate("memberships.division", "name");
   };
 
-  export const getUsers = async () => {
-    return await User.find().select("-password");
+  export const getUsers = async (filters = {}) => {
+    return await User.find(filters)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name")
+      .populate("assignedDivisions", "name");
   };
 
   export const getUserById = async (id) => {
@@ -151,7 +155,7 @@ export const createUser = async (userData, creatorUser) => {
   };
 
   export const updateUser = async (id, updateData) => {
-    const { email, role, division, is_Member } = updateData;
+    const { email, role, division, is_Member, name } = updateData;
     let user = await User.findById(id);
 
     if (!user) {
@@ -161,9 +165,13 @@ export const createUser = async (userData, creatorUser) => {
     }
 
     if (email) user.email = email;
+    if (name) user.name = name;
     if (role) user.role = role;
     if (division) user.division = division;
     if (is_Member !== undefined) user.is_Member = is_Member;
+    if (updateData.firstLogin !== undefined) user.firstLogin = updateData.firstLogin;
+    if (updateData.motivation) user.motivation = updateData.motivation;
+    if (updateData.dedication) user.dedication = updateData.dedication;
 
     await user.save();
     return user;
@@ -176,6 +184,21 @@ export const deleteUser = async (id) => {
     err.statusCode = 404;
     throw err;
   }
+  return user;
+};
+
+export const completeOnboarding = async (id, onboardingData) => {
+  const { motivation, dedication } = onboardingData;
+  const user = await User.findById(id);
+  if (!user) {
+    const err = new Error("User not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  if (motivation) user.motivation = motivation;
+  if (dedication) user.dedication = dedication;
+  user.firstLogin = false;
+  await user.save();
   return user;
 };
 
@@ -202,24 +225,32 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
 
   const oldRole = user.role;
 
-  // 1. Promote to Instructor (Division Admin Action)
+  // 1. Promote to Instructor (Admin or Super Admin Action)
   if (newRole === 'instructor') {
-    if (requester.role === 'super-admin') {
-      const err = new Error("Only an Admin can promote a student to an instructor for their division.");
-      err.statusCode = 403;
-      throw err;
-    }
+    let targetDivision = divisionId;
 
-    // Admins assign the instructor to *their* division
-    const adminDivision = requester.division;
-    if (!adminDivision) {
-      const err = new Error("Admin is not assigned to a division.");
+    if (requester.role === 'admin') {
+      // Admins assign the instructor to *their* division
+      targetDivision = requester.division;
+      if (!targetDivision) {
+        const err = new Error("Admin is not assigned to a division.");
+        err.statusCode = 403;
+        throw err;
+      }
+    } else if (requester.role === 'super-admin' || requester.role === 'super_admin') {
+      if (!targetDivision) {
+        const err = new Error("Super Admin must specify a division to promote the user to.");
+        err.statusCode = 400;
+        throw err;
+      }
+    } else {
+      const err = new Error("Unauthorized to promote to instructor.");
       err.statusCode = 403;
       throw err;
     }
 
     // Find if user has membership in this division
-    let membership = user.memberships.find(m => m.division.toString() === adminDivision.toString());
+    let membership = user.memberships.find(m => m.division.toString() === targetDivision.toString());
     
     if (!membership) {
        // If not a member of this division, check if they are in the pool
@@ -229,7 +260,7 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
          throw err;
        }
        // Add them to this division's membership list
-       user.memberships.push({ division: adminDivision, isMember: true, isInstructor: true });
+       user.memberships.push({ division: targetDivision, isMember: true, isInstructor: true });
     } else {
        if (!membership.isMember) {
          const err = new Error("User is in this division but not yet a verified Member.");
@@ -243,27 +274,32 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
     user.role = 'instructor';
     
     // Add to legacy field for safety
-    if (!user.assignedDivisions.includes(adminDivision)) {
-      user.assignedDivisions.push(adminDivision);
+    if (!user.assignedDivisions.includes(targetDivision)) {
+      user.assignedDivisions.push(targetDivision);
     }
 
     await user.save();
+
+    const populatedUser = await User.findById(user._id)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name");
 
     await RoleHistory.create({
       userId: user._id,
       previousRole: oldRole,
       newRole: 'instructor',
       changedBy: requester._id,
-      divisionId: adminDivision,
-      reason: reason || `Promoted to instructor in division ${adminDivision}`
+      divisionId: targetDivision,
+      reason: reason || `Promoted to instructor in division ${targetDivision}`
     });
 
-    return { user, message: "User promoted to instructor for your division!" };
+    return { user: populatedUser, message: "User promoted to instructor for your division!" };
   }
 
   // 2. Promote to Admin (Super Admin Action)
   if (newRole === 'admin') {
-    if (requester.role !== 'super-admin') {
+    if (requester.role !== 'super-admin' && requester.role !== 'super_admin') {
       const err = new Error("Only Super Admin can promote a user to Division Admin.");
       err.statusCode = 403;
       throw err;
@@ -305,6 +341,11 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
     }
 
     await user.save();
+    
+    const populatedUser = await User.findById(user._id)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name");
 
     await RoleHistory.create({
       userId: user._id,
@@ -315,7 +356,7 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
       reason: reason || `Promoted to Admin for division ${divisionId}`
     });
 
-    return { user, tempPassRaw };
+    return { user: populatedUser, tempPassRaw };
   }
 
   const err = new Error(`Invalid promotion newRole: ${newRole}`);

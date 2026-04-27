@@ -15,7 +15,7 @@ const check = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/bms_signup';
     console.log('📡 Attempting connection to MongoDB...');
-    
+
     await mongoose.connect(mongoUri);
     console.log('✅ Connection Successful!');
 

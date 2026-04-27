@@ -46,11 +46,10 @@ class EmailService {
   static async sendPhase2TaskEmail(email, divisionName) {
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #2563eb;">Congratulations! 🚀</h2>
-        <p>You have passed Phase 1: Assessment for the <strong>${divisionName}</strong> Bootcamp!</p>
-        <p><strong>Your Next Step:</strong> Please complete the technical task in your dashboard.</p>
-        <p><a href="http://localhost:5173/dashboard/application" style="padding: 10px 15px; background: #0f172a; color: white; text-decoration: none; border-radius: 5px;">Access Technical Task</a></p>
-        <p><em>Deadline: Please submit your links within 48 hours.</em></p>
+        <h2 style="color: #2563eb;">Waitlist: Additional Requirements ⏳</h2>
+        <p>Your application for <strong>${divisionName}</strong> has been added to the waiting list.</p>
+        <p><strong>Additional Requirement:</strong> We have assigned you a new task to evaluate your skills further. Please complete it in your dashboard.</p>
+        <p><a href="http://localhost:5173/dashboard" style="padding: 10px 15px; background: #0f172a; color: white; text-decoration: none; border-radius: 5px;">View New Task</a></p>
       </div>
     `;
     await this.sendEmail({ to: email, subject: "Round Two: Technical Task - Bootcamp Selection", html });
@@ -60,13 +59,13 @@ class EmailService {
   static async sendAcceptanceEmail(email, otp, divisionName) {
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #2563eb;">Official Acceptance 🎉</h2>
-        <p>You have officially been accepted into the <strong>${divisionName}</strong> Bootcamp!</p>
+        <h2 style="color: #2563eb;">Congragulatio 🎉</h2>
+        <p>You have officially been selected for the <strong>${divisionName}</strong> Bootcamp!</p>
         <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
-            <p>To unlock your Full Bootcamp Experience, use this secure OTP for your first login:</p>
+            <p>To finalize your enrollment, use this secure OTP for your first login:</p>
             <p style="font-size: 32px; letter-spacing: 10px; color: #065f46; text-align: center;"><strong>${otp}</strong></p>
         </div>
-        <p>Welcome to the family!</p>
+        <p>Welcome to CSEC ASTU!</p>
       </div>
     `;
     await this.sendEmail({ to: email, subject: "Bootcamp Acceptance - Secure Verification Required", html });
@@ -90,8 +89,8 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
         <h2>Application Update</h2>
-        <p>Thank you for applying to our bootcamp. After careful review, we regret to inform you that we will not be moving forward with your application at this time.</p>
-        <p>We appreciate your interest and wish you the best in your career pursuits.</p>
+        <p>Sorry for this time...</p>
+        <p>After careful review, we regret to inform you that we will not be moving forward with your application for the bootcamp. We appreciate your interest.</p>
       </div>
     `;
     await this.sendEmail({ to: email, subject: "Application Status Update", html });

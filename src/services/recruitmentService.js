@@ -137,8 +137,8 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
   }
 
   else if (decision === 'ACCEPT') {
-    if (!['TASK_EVALUATION', 'WAITLIST_TASK_EVALUATION'].includes(app.status)) {
-        throw new Error("Students can only be ACCEPTED after evaluating their technical task.");
+    if (!['PENDING', 'TASK_EVALUATION', 'WAITLIST_TASK_EVALUATION'].includes(app.status)) {
+        throw new Error("Students can only be ACCEPTED from Pending or Evaluation stages.");
     }
     nextStatus = 'ACCEPTED';
 
@@ -158,6 +158,20 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
     }
 
     await EmailService.sendAcceptanceEmail(student.email, otp, app.bootcampApplied);
+
+    // Officially assign the student to the division
+    if (app.bootcamp && app.bootcamp.division) {
+      student.division = app.bootcamp.division;
+      // Add to memberships if not already there
+      const hasMembership = student.memberships.some(m => m.division.toString() === app.bootcamp.division.toString());
+      if (!hasMembership) {
+        student.memberships.push({
+          division: app.bootcamp.division,
+          isMember: true // They are now a member of this division's bootcamp
+        });
+      }
+      await student.save();
+    }
   }
 
   app.status = nextStatus;

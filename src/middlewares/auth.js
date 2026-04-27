@@ -6,6 +6,24 @@ export const protect = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'Authentication required' });
 
+    // --- DEMO MODE SUPPORT ---
+    if (token.startsWith('demo_token_')) {
+      let role = 'student';
+      if (token.includes('super_admin')) role = 'super-admin';
+      else if (token.includes('admin')) role = 'admin';
+      else if (token.includes('instructor')) role = 'instructor';
+
+      req.user = {
+        _id: '000000000000000000000000', // Mock ObjectId
+        email: `demo@${role}.com`,
+        role: role,
+        name: 'Demo User',
+        division: role === 'admin' ? '111111111111111111111111' : undefined // Mock division for demo admin
+      };
+      return next();
+    }
+    // -------------------------
+
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
     
     const currentUser = await User.findById(decoded.id);
