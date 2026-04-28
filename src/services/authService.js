@@ -211,3 +211,17 @@ export const resetPassword = async (email, otp, newPassword) => {
 
   return { success: true, message: "Password has been reset successfully. You can now log in with your new password." };
 };
+
+export const changePassword = async (userId, oldPassword, newPassword) => {
+  const user = await User.findById(userId);
+  if (!user) throw new Error("User not found");
+
+  const isMatch = await bcrypt.compare(oldPassword, user.password);
+  if (!isMatch) throw new Error("Incorrect current password");
+
+  user.password = await bcrypt.hash(newPassword, 12);
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+
+  return { message: "Password changed successfully" };
+};
