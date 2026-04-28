@@ -227,6 +227,35 @@ class EmailService {
     await this.sendEmail({ to: email, subject: "Password Reset Code", html });
   }
 
+  // 11. Welcome Email for Imported Members
+  static async sendImportWelcomeEmail(email, tempPassword, name, divisionNames) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+           <h1 style="color: #2563eb; margin: 0;">Welcome to CSEC ASTU! 🎉</h1>
+        </div>
+        <p>Hello <strong>${name}</strong>,</p>
+        <p>You have been officially added as a Member of CSEC ASTU. You are now part of the following divisions: <strong>${divisionNames.join(", ")}</strong>.</p>
+        
+        <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #4b5563; font-size: 14px;">Use these credentials for your first login:</p>
+          <p style="margin: 10px 0; font-size: 16px;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 0; font-size: 16px;"><strong>Temporary Password:</strong> <code style="background: #fff; padding: 2px 6px; border: 1px solid #d1d5db; border-radius: 4px;">${tempPassword}</code></p>
+        </div>
+
+        <p>For your security, you will be asked to change this password immediately after your first login.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="http://localhost:5173/login" style="display: inline-block; background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">Login to Member Portal</a>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #6b7280; text-align: center;">If you have any questions, please contact your Division Head or the Super Admin.</p>
+      </div>
+    `;
+    await this.sendEmail({ to: email, subject: "Welcome to CSEC ASTU - Your Member Credentials", html });
+  }
+
   static generateICS(session) {
     const format = (d) => new Date(d).toISOString().replace(/-|:|\.\d+/g, '');
     return `BEGIN:VCALENDAR

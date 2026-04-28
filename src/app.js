@@ -66,6 +66,16 @@ app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/groups", groupRoutes);
 app.use("/api/v1/success-stories", successStoryRoutes);
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error("🔥 [ERROR]:", err.stack);
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
+});
+
 app.get("/", (req, res) => {
   res.send("Bootcamp Management Backend Running 🚀");
 });

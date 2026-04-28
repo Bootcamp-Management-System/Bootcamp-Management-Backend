@@ -3,9 +3,11 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import Division from "../models/Division.js";
 import RoleHistory from "../models/RoleHistory.js";
+import EmailService from "./emailService.js";
 
 export const createUser = async (userData, creatorUser) => {
-  const { email, password, role, division, is_Member } = userData;
+  const { email, password, role, divisions, is_Member, name } = userData;
+  
   const currentUserRole = creatorUser.role;
   const creatorDivision = creatorUser.division;
 
@@ -14,6 +16,9 @@ export const createUser = async (userData, creatorUser) => {
     err.statusCode = 403;
     throw err;
   }
+
+  // Support both single division and multiple divisions input
+  const divisionList = Array.isArray(divisions) ? divisions : (userData.division ? [userData.division] : []);
 
   if (currentUserRole === 'admin') {
     if (role === 'super-admin' || role === 'admin') {
@@ -28,65 +33,58 @@ export const createUser = async (userData, creatorUser) => {
       throw err;
     }
 
-      if (!division) {
-        const err = new Error("Division ID is required when creating a user.");
-        err.statusCode = 400;
-        throw err;
-      }
-
-      if (division.toString() !== creatorDivision.toString()) {
-        const err = new Error("Admins can only create users for their own division.");
-        err.statusCode = 403;
-        throw err;
-      }
-    }
-
-    if (role === 'admin') {
-      if (!division && currentUserRole !== 'admin') {
-        const err = new Error("An Admin must be assigned a Division ID upon creation.");
-        err.statusCode = 400;
-        throw err;
-      }
-      const adminDivisionId = division || creatorDivision;
-      const divisionExists = await Division.findById(adminDivisionId);
-      if (!divisionExists) {
-        const err = new Error("The specified Division does not exist. You must create the Division first.");
-        err.statusCode = 404;
-        throw err;
-      }
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      const err = new Error("User already exists with this email");
-      err.statusCode = 400;
+    // Admins can only add to their own division
+    if (divisionList.length > 0 && !divisionList.includes(creatorDivision.toString())) {
+      const err = new Error("Admins can only create users for their own division.");
+      err.statusCode = 403;
       throw err;
     }
+  }
 
-    const tempPassword = password || crypto.randomBytes(8).toString("hex");
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    const err = new Error("User already exists with this email");
+    err.statusCode = 400;
+    throw err;
+  }
 
-    const user = await User.create({
-      email,
-      password: hashedPassword,
-      role: role || "student",
-      division: currentUserRole === 'admin' ? creatorDivision : (division || undefined),
-      assignedDivisions: currentUserRole === 'admin'
-        ? (creatorDivision ? [creatorDivision] : [])
-        : (division ? [division] : []),
-      memberships: (division || creatorDivision) ? [{
-        division: division || creatorDivision,
-        isMember: true,
-        isInstructor: true
-      }] : [],
-      is_Member: false,
-      firstLogin: true,
-      verified: false,
-      is_EmailVerified: true // Auto-verified if created by admin
-    });
+  const tempPassword = password || crypto.randomBytes(8).toString("hex");
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    return { user, tempPassword };
-  };
+  // Map divisions to memberships
+  const memberships = divisionList.map(divId => ({
+    division: divId,
+    isMember: is_Member || role === 'admin' ? true : false,
+    isInstructor: role === 'admin' ? true : false
+  }));
+
+  const user = await User.create({
+    email,
+    name,
+    password: hashedPassword,
+    role: role || "student",
+    division: currentUserRole === 'admin' ? creatorDivision : (divisionList[0] || undefined),
+    assignedDivisions: divisionList,
+    memberships: memberships,
+    is_Member: is_Member || false,
+    firstLogin: true,
+    verified: false,
+    is_EmailVerified: true
+  });
+
+  // Send Welcome Email if it's a new Member import
+  if (is_Member) {
+    try {
+      const divisionsData = await Division.find({ _id: { $in: divisionList } });
+      const divisionNames = divisionsData.map(d => d.name);
+      await EmailService.sendImportWelcomeEmail(email, tempPassword, name || email, divisionNames);
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError.message);
+    }
+  }
+
+  return { user, tempPassword };
+};
 
   export const importMembers = async (membersList) => {
     const results = [];

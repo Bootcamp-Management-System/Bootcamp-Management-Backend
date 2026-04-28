@@ -1,6 +1,7 @@
 import Division from "../models/Division.js";
 import User from "../models/User.js";
-import * as userService from "./userService.js";
+// Removed circular userService import to fix 500 error
+
 
 export const createDivision = async (divisionData) => {
   const { name, description, instructors } = divisionData;
@@ -112,6 +113,7 @@ export const assignDivisionAdmin = async ({ divisionId, userId, requester }) => 
     throw err;
   }
 
+  const userService = await import("./userService.js");
   const promotion = await userService.promoteUser(
     userId,
     { newRole: "admin", divisionId },
