@@ -24,7 +24,7 @@ import taskRoutes from "./routes/task.js";
 import userRoutes from "./routes/user.js";
 import groupRoutes from "./routes/group.js";
 
-dotenv.config();
+dotenv.config({ path: "src/config/.env" });
 connectDB();
 
 // Verify email service connection

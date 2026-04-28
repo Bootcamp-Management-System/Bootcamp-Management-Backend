@@ -76,8 +76,8 @@ export const createUser = async (userData, creatorUser) => {
         : (division ? [division] : []),
       memberships: (division || creatorDivision) ? [{
         division: division || creatorDivision,
-        isMember: role === 'admin' ? true : false,
-        isInstructor: role === 'admin' ? true : false
+        isMember: true,
+        isInstructor: true
       }] : [],
       is_Member: false,
       firstLogin: true,
@@ -331,14 +331,10 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
     user.firstLogin = true;
     user.password = hashedTempPass;
     
-    // Add/Update membership for this division
-    let membership = user.memberships.find(m => m.division.toString() === divisionId.toString());
-    if (membership) {
-      membership.isMember = true;
-      membership.isInstructor = true; // Admins are implicitly instructors for their division
-    } else {
-      user.memberships.push({ division: divisionId, isMember: true, isInstructor: true });
-    }
+    // STRICT RULE: Admins are assigned to EXACTLY ONE division.
+    // Clear all previous memberships and assignments to prevent overlap.
+    user.memberships = [{ division: divisionId, isMember: true, isInstructor: true }];
+    user.assignedDivisions = [divisionId];
 
     await user.save();
     

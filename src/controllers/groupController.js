@@ -21,8 +21,17 @@ export const createGroup = async (req, res) => {
 
 export const getGroups = async (req, res) => {
     try {
-        const query = { division: req.user.division };
+        let query = {};
         
+        // Division Isolation for Admins
+        if (req.user.role === 'admin') {
+            query.division = req.user.division;
+        } 
+        // Global Access for Team's Super-Admins
+        else if (req.user.role === 'super-admin' && req.query.division) {
+            query.division = req.query.division;
+        }
+
         const groups = await Group.find(query)
             .populate('bootcamp', 'name')
             .populate('instructor', 'name email')

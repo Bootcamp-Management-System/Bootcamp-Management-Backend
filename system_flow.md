@@ -8,7 +8,7 @@ This document explains the end-to-end flow of the BMS, focusing on its dynamic r
 The system is built on a **Division-Based Multi-Tenant** model.
 - **Super Admins:** Oversee the entire academy.
 - **Divisions:** Specialized branches (e.g., Software Engineering, Data Science).
-- **Admins:** Manage one or more divisions. They have full control over their territory but cannot touch other divisions.
+- **Admins:** Manage exactly one division. They have full control over their territory but are strictly isolated from all other divisions.
 
 ---
 
