@@ -363,3 +363,149 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
   err.statusCode = 400;
   throw err;
 };
+
+export const demoteUser = async (targetUserId, demotionData, requester) => {
+  const { newRole, reason } = demotionData;
+
+  if (!['instructor', 'student'].includes(newRole)) {
+    const err = new Error("Invalid demotion role. Can only demote to 'instructor' or 'student'.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (requester.role !== 'super-admin' && requester.role !== 'super_admin') {
+    const err = new Error("Only Super Admin can demote users.");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const user = await User.findById(targetUserId);
+  if (!user) {
+    const err = new Error("User not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const oldRole = user.role;
+
+  // 1. Demote from Admin to Instructor
+  if (oldRole === 'admin' && newRole === 'instructor') {
+    if (user.role !== 'admin') {
+      const err = new Error("User is not an admin.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Keep the user as instructor in their assigned division
+    // Remove admin privileges but maintain instructor status
+    user.role = 'instructor';
+
+    // Admin demotion doesn't change memberships - they remain instructors in their division
+    // But we should clear the legacy division field since they're no longer division admins
+    user.division = undefined;
+
+    await user.save();
+
+    const populatedUser = await User.findById(user._id)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name");
+
+    await RoleHistory.create({
+      userId: user._id,
+      previousRole: oldRole,
+      newRole: 'instructor',
+      changedBy: requester._id,
+      divisionId: user.memberships?.[0]?.division || null,
+      reason: reason || `Demoted from Admin to Instructor`
+    });
+
+    return { user: populatedUser, message: "User demoted from Admin to Instructor successfully!" };
+  }
+
+  // 2. Demote from Instructor to Student
+  if (oldRole === 'instructor' && newRole === 'student') {
+    if (user.role !== 'instructor') {
+      const err = new Error("User is not an instructor.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Change role to student
+    user.role = 'student';
+
+    // Remove instructor status from all memberships
+    user.memberships = user.memberships.map(membership => ({
+      ...membership,
+      isInstructor: false
+    }));
+
+    // Clear legacy assignedDivisions
+    user.assignedDivisions = [];
+
+    // Update global mentoring flag
+    user.is_Mentoring = false;
+
+    await user.save();
+
+    const populatedUser = await User.findById(user._id)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name");
+
+    await RoleHistory.create({
+      userId: user._id,
+      previousRole: oldRole,
+      newRole: 'student',
+      changedBy: requester._id,
+      divisionId: null,
+      reason: reason || `Demoted from Instructor to Student`
+    });
+
+    return { user: populatedUser, message: "User demoted from Instructor to Student successfully!" };
+  }
+
+  // 3. Demote from Admin directly to Student (if needed)
+  if (oldRole === 'admin' && newRole === 'student') {
+    if (user.role !== 'admin') {
+      const err = new Error("User is not an admin.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Change role to student
+    user.role = 'student';
+
+    // Remove instructor status from all memberships and clear admin division
+    user.memberships = user.memberships.map(membership => ({
+      ...membership,
+      isInstructor: false
+    }));
+
+    user.division = undefined;
+    user.assignedDivisions = [];
+    user.is_Mentoring = false;
+
+    await user.save();
+
+    const populatedUser = await User.findById(user._id)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name");
+
+    await RoleHistory.create({
+      userId: user._id,
+      previousRole: oldRole,
+      newRole: 'student',
+      changedBy: requester._id,
+      divisionId: null,
+      reason: reason || `Demoted from Admin to Student`
+    });
+
+    return { user: populatedUser, message: "User demoted from Admin to Student successfully!" };
+  }
+
+  const err = new Error(`Invalid demotion: cannot demote ${oldRole} to ${newRole}`);
+  err.statusCode = 400;
+  throw err;
+};

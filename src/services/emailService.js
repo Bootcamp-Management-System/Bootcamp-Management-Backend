@@ -1,28 +1,57 @@
 import nodemailer from "nodemailer";
 
 class EmailService {
+  static transporter = null;
+
   static getTransporter() {
-    return nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    if (!this.transporter) {
+      this.transporter = nodemailer.createTransport({
+        service: "Gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+    }
+    return this.transporter;
+  }
+
+  static async verifyConnection() {
+    try {
+      await this.getTransporter().verify();
+      console.log('✅ Email service connected successfully');
+    } catch (error) {
+      console.error('❌ Email service connection failed:', error.message);
+    }
   }
 
   static async sendEmail(options) {
     try {
+      console.log(`📧 Attempting to send email to ${options.to} with subject: ${options.subject}`);
+      
       const mailOptions = {
         from: `"BMS Portal" <${process.env.EMAIL_USER}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
       };
-      await this.getTransporter().sendMail(mailOptions);
-      console.log(`📧 Email sent to ${options.to}`);
+
+      console.log('📧 Mail options:', { from: mailOptions.from, to: mailOptions.to, subject: mailOptions.subject });
+      
+      const result = await this.getTransporter().sendMail(mailOptions);
+      console.log(`✅ Email sent successfully to ${options.to}. Message ID: ${result.messageId}`);
+      
+      return result;
     } catch (error) {
       console.error("❌ Email Dispatch Failed:", error.message);
+      console.error("❌ Full error:", error);
+      
+      // For development, don't throw error to prevent signup failure
+      if (process.env.NODE_ENV === 'production') {
+        throw error;
+      }
+      
+      return null;
     }
   }
 
@@ -59,7 +88,7 @@ class EmailService {
   static async sendAcceptanceEmail(email, otp, divisionName) {
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #2563eb;">Congragulatio 🎉</h2>
+        <h2 style="color: #2563eb;">Congratulations 🎉</h2>
         <p>You have officially been selected for the <strong>${divisionName}</strong> Bootcamp!</p>
         <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
             <p>To finalize your enrollment, use this secure OTP for your first login:</p>
@@ -89,8 +118,8 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
         <h2>Application Update</h2>
-        <p>Sorry for this time...</p>
-        <p>After careful review, we regret to inform you that we will not be moving forward with your application for the bootcamp. We appreciate your interest.</p>
+        <p>Thank you for your interest in our bootcamp program.</p>
+        <p>After careful review, we regret to inform you that we will not be moving forward with your application at this time. We appreciate your interest and encourage you to apply for future opportunities.</p>
       </div>
     `;
     await this.sendEmail({ to: email, subject: "Application Status Update", html });

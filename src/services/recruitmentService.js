@@ -179,9 +179,25 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
   return await app.save();
 };
 
-export const fetchApplicationsRepo = async (filter) => {
-  return await Application.find(filter)
+export const fetchApplicationsRepo = async (filter, adminDivision = null) => {
+  let query = Application.find(filter)
     .populate('student', 'email name')
-    .populate('bootcamp', 'name')
+    .populate({
+      path: 'bootcamp',
+      select: 'name division',
+      populate: {
+        path: 'division',
+        select: 'name'
+      }
+    })
     .sort('-createdAt');
+
+  // For admin, filter by bootcamp division
+  if (adminDivision) {
+    const bootcamps = await Bootcamp.find({ division: adminDivision }).select('_id');
+    const bootcampIds = bootcamps.map(b => b._id);
+    query = query.where('bootcamp').in(bootcampIds);
+  }
+
+  return await query;
 };

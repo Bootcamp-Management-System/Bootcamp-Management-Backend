@@ -103,14 +103,25 @@ export const makeDecision = async (req, res) => {
 
 export const getApplications = async (req, res) => {
   try {
-    const filter = {};
+    let filter = {};
     if (req.user.role === 'student') {
       filter.student = req.user._id || req.user.id;
-    } else if (req.user.role === 'admin') {
-      filter.division = req.user.division;
+    } else {
+      // For admin and super-admin, allow filtering by bootcamp
+      if (req.query.bootcampId) {
+        filter.bootcamp = req.query.bootcampId;
+      }
+      // Allow filtering by status
+      if (req.query.status) {
+        filter.status = req.query.status;
+      }
+      // For admin, also filter by division if no specific bootcamp
+      if (req.user.role === 'admin' && !req.query.bootcampId) {
+        // Filter will be handled in service
+      }
     }
     // super-admin sees all
-    const applications = await recruitmentService.fetchApplicationsRepo(filter);
+    const applications = await recruitmentService.fetchApplicationsRepo(filter, req.user.role === 'admin' && !req.query.bootcampId ? req.user.division : null);
     res.status(200).json({ success: true, count: applications.length, data: applications });
   } catch (error) {
     res.status(500).json({ error: error.message });

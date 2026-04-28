@@ -35,6 +35,16 @@ export const verifyOtp = async (req, res) => {
   }
 };
 
+export const resendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await authService.resendOtp(email);
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 export const googleLogin = async (req, res) => {
   try {
     const { googleToken } = req.body;

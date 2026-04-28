@@ -63,7 +63,7 @@ const User = mongoose.models.User || mongoose.model('User', userSchema);
 const DIVISIONS = [
   { name: 'Development', description: 'Software development, web & mobile engineering bootcamp.' },
   { name: 'Data Science', description: 'Machine learning, data analysis, and AI bootcamp.' },
-  { name: 'Cybersecurity', description: 'Ethical hacking, network security, and CTF bootcamp.' },
+  { name: 'Cyber Security', description: 'Ethical hacking, network security, and CTF bootcamp.' },
   { name: 'CPD', description: 'Competitive Programming & problem-solving bootcamp.' },
 ];
 
@@ -204,7 +204,7 @@ async function seed() {
   const divMap = {};
   for (const d of divisionDocs) divMap[d.name] = d._id;
 
-  const divisionNames = ['Development', 'Data Science', 'Cybersecurity', 'CPD'];
+  const divisionNames = ['Development', 'Data Science', 'Cyber Security', 'CPD'];
 
   // 2. Insert 100 members (25 per division, round-robin)
   console.log('\n👥 Seeding 100 members...');

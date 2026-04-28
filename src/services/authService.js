@@ -45,8 +45,10 @@ export const signupUser = async (userData) => {
 
   try {
     await EmailService.sendVerificationEmail(user.email, otpCode);
+    console.log(`✅ Verification email sent to ${user.email}`);
   } catch (error) {
-    console.warn('⚠️ Email Service Error: OTP could not be sent. For development, use this code:', otpCode);
+    console.error('❌ Email Service Error:', error.message);
+    console.log(`⚠️ For testing: OTP for ${user.email} is: ${otpCode}`);
   }
 
   return { 
@@ -86,6 +88,31 @@ export const verifyOtp = async (email, otp, newPassword) => {
       division: user.division,
       firstLogin: user.firstLogin
     }
+  };
+};
+
+export const resendOtp = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found");
+
+  if (user.is_EmailVerified) throw new Error("User is already verified");
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+  user.otp = { code: otpCode, expiresAt: Date.now() + 15 * 60 * 1000 };
+  await user.save();
+
+  try {
+    await EmailService.sendVerificationEmail(user.email, otpCode);
+    console.log(`✅ Verification email resent to ${user.email}`);
+  } catch (error) {
+    console.error('❌ Email Service Error:', error.message);
+    console.log(`⚠️ For testing: OTP for ${user.email} is: ${otpCode}`);
+  }
+
+  return { 
+    message: "OTP sent successfully. Please check your email.",
+    otpCode: process.env.NODE_ENV === 'development' ? otpCode : undefined // Expose OTP in dev mode
   };
 };
 

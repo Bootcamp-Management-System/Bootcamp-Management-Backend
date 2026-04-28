@@ -46,3 +46,15 @@ export const assignInstructor = async (req, res) => {
     res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
   }
 };
+
+export const getAvailableInstructors = async (req, res) => {
+  try {
+    const { divisionId } = req.params;
+    if (!divisionId) return res.status(400).json({ error: "divisionId is required" });
+    
+    const instructors = await sessionService.getAvailableInstructors(divisionId);
+    res.status(200).json({ success: true, count: instructors.length, data: instructors });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
+  }
+};

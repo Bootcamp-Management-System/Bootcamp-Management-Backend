@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Bootcamp from "../models/Bootcamp.js";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
@@ -46,7 +47,7 @@ const notifyInstructor = async (session) => {
 };
 
 export const createSession = async (sessionData) => {
-  const { title, description, bootcamp, instructor, location, meetingLink, startTime, endTime } = sessionData;
+  const { title, description, bootcamp, division, instructor, location, meetingLink, startTime, endTime } = sessionData;
 
   if (!startTime || !endTime) {
     const err = new Error("Start and end times are required");
@@ -64,13 +65,18 @@ export const createSession = async (sessionData) => {
     throw err;
   }
 
-  const bootcampExists = await Bootcamp.findById(bootcamp);
-  if (!bootcampExists) {
-    const err = new Error("Bootcamp not found");
-    err.statusCode = 404;
-    throw err;
+  let divisionId;
+  if (bootcamp) {
+    const bootcampExists = await Bootcamp.findById(bootcamp);
+    if (!bootcampExists) {
+      const err = new Error("Bootcamp not found");
+      err.statusCode = 404;
+      throw err;
+    }
+    divisionId = bootcampExists.division;
+  } else {
+    divisionId = new mongoose.Types.ObjectId(division);
   }
-  const divisionId = bootcampExists.division;
 
   if (instructor) {
     const instructorExists = await User.findById(instructor);
@@ -80,13 +86,15 @@ export const createSession = async (sessionData) => {
       throw err;
     }
 
-    // Check if user is an instructor in this division's memberships
-    const membership = instructorExists.memberships.find(m => m.division.toString() === divisionId.toString());
-    const isActuallyInstructor = membership && membership.isInstructor;
+    // Check if user is a MEMBER of this division (being a member is sufficient to be instructor)
+    const membership = instructorExists.memberships.find(m => 
+      m.division.toString() === divisionId.toString() && m.isMember === true
+    );
+    const isDivisionMember = !!membership;
     const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
 
-    if (!isActuallyInstructor && !isGlobalAdmin) {
-      const err = new Error("User is not a promoted instructor for this division");
+    if (!isDivisionMember && !isGlobalAdmin) {
+      const err = new Error("Instructor must be a member of this division");
       err.statusCode = 403;
       throw err;
     }
@@ -102,11 +110,13 @@ export const createSession = async (sessionData) => {
     $or: []
   };
 
-  conflictQuery.$or.push({
-    bootcamp,
-    startTime: { $lt: end },
-    endTime: { $gt: start }
-  });
+  if (bootcamp) {
+    conflictQuery.$or.push({
+      bootcamp,
+      startTime: { $lt: end },
+      endTime: { $gt: start }
+    });
+  }
 
   if (instructor) {
     conflictQuery.$or.push({
@@ -128,6 +138,7 @@ export const createSession = async (sessionData) => {
     title,
     description,
     bootcamp,
+    division: divisionId,
     instructor,
     location,
     meetingLink,
@@ -180,12 +191,14 @@ export const updateSession = async (id, updateData) => {
     const sessionBootcamp = await Bootcamp.findById(sessionToUpdate.bootcamp);
     const divisionId = sessionBootcamp.division;
 
-    const membership = instructorExists.memberships.find(m => m.division.toString() === divisionId.toString());
-    const isActuallyInstructor = membership && membership.isInstructor;
+    const membership = instructorExists.memberships.find(m => 
+      m.division.toString() === divisionId.toString() && m.isMember === true
+    );
+    const isDivisionMember = !!membership;
     const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
 
-    if (!isActuallyInstructor && !isGlobalAdmin) {
-      const err = new Error("User is not a promoted instructor for this division");
+    if (!isDivisionMember && !isGlobalAdmin) {
+      const err = new Error("Instructor must be a member of this division");
       err.statusCode = 403;
       throw err;
     }
@@ -231,4 +244,21 @@ export const deleteSession = async (id) => {
 
   await Session.findByIdAndDelete(id);
   return session;
+};
+
+export const getAvailableInstructors = async (divisionId) => {
+  // Find users who are members of this division (being a member is sufficient to be instructor)
+  const instructors = await User.find({
+    'memberships': {
+      $elemMatch: {
+        division: divisionId,
+        isMember: true
+      }
+    },
+    is_Mentoring: false // Not currently assigned to another session
+  })
+  .select('name email campusId motivation dedication memberships role')
+  .populate('memberships.division', 'name');
+
+  return instructors;
 };

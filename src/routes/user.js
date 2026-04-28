@@ -4,6 +4,7 @@ import {
   getMe,
   getUsers,
   promoteUser,
+  demoteUser,
   getUser,
   updateUser,
   deleteUser,
@@ -50,6 +51,8 @@ router.use(authMiddleware);
 router.post("/promote", restrictTo("super-admin", "admin"), promoteUser);
 // PATCH /users/:id/promote
 router.patch("/:id/promote", restrictTo("super-admin", "admin"), promoteUser);
+// PATCH /users/:id/demote
+router.patch("/:id/demote", restrictTo("super-admin", "super_admin"), demoteUser);
 
 router.post("/import-members", restrictTo("super-admin"), importMembers);
 router.get("/pool", restrictTo("super-admin", "admin"), getMemberPool);

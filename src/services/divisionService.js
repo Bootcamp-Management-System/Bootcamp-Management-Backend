@@ -97,9 +97,10 @@ export const deleteDivision = async (id) => {
 };
 
 export const getUsersByDivision = async (divisionId) => {
-  const users = await User.find({ division: divisionId }).select(
-    "_id name email role division"
-  );
+  const users = await User.find({ division: divisionId })
+    .select("_id name email role division memberships is_Member")
+    .populate("division", "name")
+    .populate("memberships.division", "name");
   return users;
 };
 

@@ -27,6 +27,10 @@ import groupRoutes from "./routes/group.js";
 dotenv.config();
 connectDB();
 
+// Verify email service connection
+import EmailService from "./services/emailService.js";
+EmailService.verifyConnection();
+
 const app = express();
 
 app.use(helmet());

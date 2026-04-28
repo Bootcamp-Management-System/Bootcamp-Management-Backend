@@ -90,6 +90,23 @@ export const promoteUser = async (req, res) => {
   }
 };
 
+// @desc    Demote User to a lower role
+// @route   PATCH /users/:id/demote
+// @access  Private (super-admin only)
+export const demoteUser = async (req, res) => {
+  try {
+    const result = await userService.demoteUser(req.params.id, req.body, req.user);
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      userId: result.user._id,
+      newRole: result.user.role
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
+  }
+};
+
 // @desc    Get currently logged in user
 // @route   GET /api/v1/users/me
 // @access  Private
