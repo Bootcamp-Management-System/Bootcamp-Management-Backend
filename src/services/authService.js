@@ -117,12 +117,22 @@ export const resendOtp = async (email) => {
 };
 
 export const loginUser = async (email, password) => {
-  const user = await User.findOne({ email }).populate('division');
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail }).populate('division');
+  
+  if (!user) throw new Error("Invalid email or password");
+
+  // Check if password is a hash. Bcrypt hashes start with $2
+  const isHash = user.password.startsWith('$2');
+  const isMatch = isHash 
+    ? await bcrypt.compare(password, user.password)
+    : password === user.password;
+
+  if (!isMatch) {
     throw new Error("Invalid email or password");
   }
 
-  if (!user.is_EmailVerified) {
+  if (!user.is_EmailVerified && user.role !== 'super-admin' && user.role !== 'super_admin' && user.role !== 'admin') {
     throw new Error("Please verify your email address before logging in.");
   }
 
@@ -216,11 +226,20 @@ export const changePassword = async (userId, oldPassword, newPassword) => {
   const user = await User.findById(userId);
   if (!user) throw new Error("User not found");
 
-  const isMatch = await bcrypt.compare(oldPassword, user.password);
-  if (!isMatch) throw new Error("Incorrect current password");
+  // Verify current password (handles both bcrypt hashes and legacy plain-text)
+  const isHash = user.password.startsWith('$2');
+  const isMatch = isHash 
+    ? await bcrypt.compare(oldPassword, user.password)
+    : oldPassword === user.password;
 
+  if (!isMatch) {
+    throw new Error("Incorrect current password");
+  }
+
+  // Set new secure password
   user.password = await bcrypt.hash(newPassword, 12);
   user.tokenVersion = (user.tokenVersion || 0) + 1;
+  user.firstLogin = false; // Mark as no longer first login
   await user.save();
 
   return { message: "Password changed successfully" };

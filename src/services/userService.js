@@ -68,7 +68,7 @@ export const createUser = async (userData, creatorUser) => {
     memberships: memberships,
     is_Member: is_Member || false,
     firstLogin: true,
-    verified: false,
+    verified: true,
     is_EmailVerified: true
   });
 
@@ -270,6 +270,8 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
 
     // Switch their global role to instructor for dashboard access
     user.role = 'instructor';
+    user.verified = true;
+    user.is_EmailVerified = true;
     
     // Add to legacy field for safety
     if (!user.assignedDivisions.includes(targetDivision)) {
@@ -321,16 +323,22 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
       throw err;
     }
 
-    const tempPassRaw = crypto.randomBytes(8).toString('hex');
-    const hashedTempPass = await bcrypt.hash(tempPassRaw, 10);
+    // Only generate a new password if the user doesn't have one (e.g. they were created without one)
+    // or if we want to force a reset during promotion. 
+    // For now, let's KEEP their existing password if they have one.
+    if (!user.password) {
+      const tempPassRaw = crypto.randomBytes(8).toString('hex');
+      user.password = await bcrypt.hash(tempPassRaw, 10);
+      user.firstLogin = true;
+      promotionData.tempPassRaw = tempPassRaw;
+    }
 
     user.role = 'admin';
     user.division = divisionId;
-    user.firstLogin = true;
-    user.password = hashedTempPass;
+    user.verified = true;
+    user.is_EmailVerified = true;
+    user.firstLogin = false; // Allow them to use existing pass without forced change
     
-    // STRICT RULE: Admins are assigned to EXACTLY ONE division.
-    // Clear all previous memberships and assignments to prevent overlap.
     user.memberships = [{ division: divisionId, isMember: true, isInstructor: true }];
     user.assignedDivisions = [divisionId];
 
@@ -350,7 +358,7 @@ export const promoteUser = async (targetUserId, promotionData, requester) => {
       reason: reason || `Promoted to Admin for division ${divisionId}`
     });
 
-    return { user: populatedUser, tempPassRaw };
+    return { user: populatedUser, tempPassRaw: promotionData.tempPassRaw };
   }
 
   const err = new Error(`Invalid promotion newRole: ${newRole}`);
