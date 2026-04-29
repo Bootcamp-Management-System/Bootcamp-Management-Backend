@@ -1,14 +1,14 @@
 import express from "express";
-import { 
+import {
   createOrUpdateTemplate,
   publishTemplate,
   unpublishTemplate,
   getTemplate,
-  apply, 
-  submitTechnicalTask, 
-  submitWaitlistTask, 
-  makeDecision, 
-  getApplications 
+  apply,
+  submitTechnicalTask,
+  submitWaitlistTask,
+  makeDecision,
+  getApplications
 } from "../controllers/recruitmentController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";

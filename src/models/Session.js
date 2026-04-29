@@ -13,7 +13,7 @@ const sessionSchema = new mongoose.Schema(
     bootcamp: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Bootcamp",
-      // required: [true, "Division ID is required"], // Made optional for division-wide sessions
+      required: [true, "Bootcamp is required"],
     },
     division: {
       type: mongoose.Schema.Types.ObjectId,

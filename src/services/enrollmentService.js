@@ -29,3 +29,8 @@ export const getMyEnrollments = async (studentId) => {
     .populate('bootcamp', 'name startDate endDate bannerImage')
     .sort('-createdAt');
 };
+
+export const getBootcampEnrollments = async (bootcampId) => {
+  return await Enrollment.find({ bootcamp: bootcampId, is_active: true })
+    .populate('student', 'name email campusId');
+};

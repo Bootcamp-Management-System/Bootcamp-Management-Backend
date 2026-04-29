@@ -38,9 +38,9 @@ export const getTemplate = async (req, res) => {
     const template = await recruitmentService.getTemplateByBootcampRepo(bootcampId);
     if (!template) {
       if (req.user.role === 'super-admin' || req.user.role === 'super_admin' || req.user.role === 'admin') {
-        return res.status(200).json({ 
-          success: true, 
-          data: { phase1Fields: [], phase2Fields: [], waitlistFields: [], isPublished: false, bootcamp: bootcampId } 
+        return res.status(200).json({
+          success: true,
+          data: { phase1Fields: [], phase2Fields: [], waitlistFields: [], isPublished: false, bootcamp: bootcampId }
         });
       }
       return res.status(404).json({ error: "No template found for this bootcamp" });

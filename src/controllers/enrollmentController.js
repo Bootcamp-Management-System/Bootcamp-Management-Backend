@@ -22,3 +22,13 @@ export const getMyEnrollments = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const getBootcampEnrollments = async (req, res) => {
+  try {
+    const { bootcampId } = req.params;
+    const data = await enrollmentService.getBootcampEnrollments(bootcampId);
+    res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

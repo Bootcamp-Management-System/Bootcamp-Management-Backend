@@ -2,7 +2,8 @@ import Task from "../models/Task.js";
 import Session from "../models/Session.js";
 
 export const createTask = async (taskData, creator) => {
-  const { title, description, startTime, endTime, deadline, bootcamp, session } = taskData;
+  const { title, description, startTime, endTime, deadline, session } = taskData;
+  let { bootcamp } = taskData;
 
   if (session) {
     const sessionData = await Session.findById(session);
@@ -11,11 +12,16 @@ export const createTask = async (taskData, creator) => {
       err.statusCode = 404;
       throw err;
     }
+
+    // Infer bootcamp if missing
+    if (!bootcamp && sessionData.bootcamp) {
+      bootcamp = sessionData.bootcamp;
+    }
     
     // Contextual Permission Check
-    const isSuperAdmin = creator.role === 'super-admin';
+    const isSuperAdmin = creator.role === 'super-admin' || creator.role === 'super_admin';
     const isAdminOfDivision = creator.role === 'admin' && creator.division?.toString() === sessionData.division?.toString();
-    const isSessionInstructor = sessionData.instructor?.toString() === creator.id.toString();
+    const isSessionInstructor = sessionData.instructor?.toString() === (creator._id || creator.id)?.toString();
 
     if (!isSuperAdmin && !isAdminOfDivision && !isSessionInstructor) {
       const err = new Error("You do not have permission to post a task for this session. Only the assigned instructor or division admin can do this.");
@@ -23,11 +29,17 @@ export const createTask = async (taskData, creator) => {
       throw err;
     }
 
-    if (sessionData.bootcamp.toString() !== bootcamp.toString()) {
+    if (bootcamp && sessionData.bootcamp && sessionData.bootcamp.toString() !== bootcamp.toString()) {
       const err = new Error("Session does not belong to the specified bootcamp");
       err.statusCode = 400;
       throw err;
     }
+  }
+
+  if (!bootcamp) {
+    const err = new Error("Task must belong to a bootcamp. Please ensure the selected session is linked to a bootcamp.");
+    err.statusCode = 400;
+    throw err;
   }
 
   const task = await Task.create({
@@ -38,7 +50,7 @@ export const createTask = async (taskData, creator) => {
     deadline,
     bootcamp,
     session,
-    createdBy: creator.id
+    createdBy: creator._id || creator.id
   });
 
   return task;
