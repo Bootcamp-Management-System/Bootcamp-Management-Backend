@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["SESSION", "ASSIGNMENT", "TASK", "MEMBERSHIP"],
+      enum: ["SESSION", "ASSIGNMENT", "TASK", "MEMBERSHIP", "ANNOUNCEMENT"],
       default: "SESSION",
     },
     isRead: {

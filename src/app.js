@@ -23,6 +23,7 @@ import successStoryRoutes from "./routes/successStory.js";
 import taskRoutes from "./routes/task.js";
 import userRoutes from "./routes/user.js";
 import groupRoutes from "./routes/group.js";
+import announcementRoutes from "./routes/announcementRoutes.js";
 
 dotenv.config({ path: "src/config/.env" });
 connectDB();
@@ -65,6 +66,7 @@ app.use("/api/v1/membership", membershipRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/groups", groupRoutes);
 app.use("/api/v1/success-stories", successStoryRoutes);
+app.use("/api/v1/announcements", announcementRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {
