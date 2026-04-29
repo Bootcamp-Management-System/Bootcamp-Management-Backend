@@ -65,7 +65,7 @@ class EmailService {
           ${otp}
         </div>
         <p style="margin-top: 20px;">Or click the button below to go to the verification page:</p>
-        <a href="http://localhost:5173/verify?email=${email}" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">Verify Now</a>
+        <a href="http://localhost:5173/otp?email=${email}" style="display: inline-block; background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">Verify Now</a>
       </div>
     `;
     await this.sendEmail({ to: email, subject: "Action Required: Verify Your Account", html });
