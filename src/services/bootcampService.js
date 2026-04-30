@@ -1,4 +1,5 @@
 import Bootcamp from "../models/Bootcamp.js";
+import ApplicationTemplate from "../models/ApplicationTemplate.js";
 
 export const createBootcamp = async (data, userId) => {
   return await Bootcamp.create({ ...data, createdBy: userId });
@@ -29,4 +30,16 @@ export const deleteBootcamp = async (id) => {
 // Public method for Landing Page
 export const getPublishedBootcamps = async () => {
   return await Bootcamp.find({ isPublished: true }).populate('division', 'name description');
+};
+
+export const getAvailableBootcamps = async () => {
+  const publishedTemplates = await ApplicationTemplate.find({ isPublished: true }).select("bootcamp");
+  const bootcampIds = publishedTemplates.map((template) => template.bootcamp);
+
+  return await Bootcamp.find({
+    _id: { $in: bootcampIds },
+    isPublished: true,
+  })
+    .populate("division", "name description")
+    .sort("-createdAt");
 };

@@ -5,7 +5,8 @@ import {
   getBootcamp, 
   updateBootcamp, 
   deleteBootcamp,
-  getPublicBootcamps 
+  getPublicBootcamps,
+  getAvailableBootcamps
 } from "../controllers/bootcampController.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
@@ -15,6 +16,7 @@ const router = express.Router();
 // Public Routes (No Auth Required)
 router.get("/public", getPublicBootcamps);
 router.get("/public/:id", getBootcamp);
+router.get("/available", getAvailableBootcamps);
 
 // Protected Routes
 router.use(authMiddleware);

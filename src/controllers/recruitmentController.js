@@ -10,36 +10,59 @@ import {
   fetchApplicationsRepo,
   fetchApplicationByIdRepo
 } from "../services/recruitmentService.js";
+import Bootcamp from "../models/Bootcamp.js";
+
+const applicantRoles = ["student", "instructor"];
+
+const canManageBootcamp = async (bootcampId, user) => {
+  if (user.role === "super-admin" || user.role === "super_admin") return true;
+  if (user.role !== "admin" || !user.division) return false;
+
+  const bootcamp = await Bootcamp.findById(bootcampId).select("division");
+  return bootcamp?.division?.toString() === user.division.toString();
+};
+
+const ensureBootcampAccess = async (bootcampId, user) => {
+  const allowed = await canManageBootcamp(bootcampId, user);
+  if (!allowed) {
+    const err = new Error("You can only manage recruitment for bootcamps in your division.");
+    err.statusCode = 403;
+    throw err;
+  }
+};
 
 // ─── ADMIN: Template Management ──────────────────────────────────────────────
 
 export const createOrUpdateTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
+    await ensureBootcampAccess(bootcampId, req.user);
     const template = await createOrUpdateTemplateRepo(bootcampId, req.body, req.user.id);
     res.status(200).json({ success: true, message: "Template saved", data: template });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(error.statusCode || 400).json({ error: error.message });
   }
 };
 
 export const publishTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
+    await ensureBootcampAccess(bootcampId, req.user);
     const template = await publishTemplateRepo(bootcampId, req.user.id);
     res.status(200).json({ success: true, message: "Application form is now LIVE for students", data: template });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(error.statusCode || 400).json({ error: error.message });
   }
 };
 
 export const unpublishTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
+    await ensureBootcampAccess(bootcampId, req.user);
     const template = await unpublishTemplateRepo(bootcampId, req.user.id);
     res.status(200).json({ success: true, message: "Application form hidden from students", data: template });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(error.statusCode || 400).json({ error: error.message });
   }
 };
 
@@ -57,8 +80,8 @@ export const getTemplate = async (req, res) => {
       return res.status(404).json({ error: "No template found for this bootcamp" });
     }
 
-    // Students only see published templates, UNLESS they have an existing application
-    if (req.user.role === 'student' && !template.isPublished) {
+    // Applicants only see published templates, UNLESS they already have an application.
+    if (applicantRoles.includes(req.user.role) && !template.isPublished) {
       const existingApp = await fetchApplicationsRepo({ 
         student: req.user._id || req.user.id, 
         bootcamp: bootcampId 
@@ -112,19 +135,27 @@ export const submitWaitlistTask = async (req, res) => {
 export const makeDecision = async (req, res) => {
   try {
     const { applicationId } = req.params;
+    const existingApplication = await fetchApplicationByIdRepo(applicationId);
+    if (!existingApplication) return res.status(404).json({ error: "Application not found" });
+    await ensureBootcampAccess(existingApplication.bootcamp?._id || existingApplication.bootcamp, req.user);
+
     const application = await handleAdminDecisionRepo(applicationId, req.user.id, req.body);
     res.status(200).json({ success: true, message: `Decision '${req.body.decision}' applied`, data: application });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(error.statusCode || 400).json({ error: error.message });
   }
 };
 
 export const getApplications = async (req, res) => {
   try {
     let filter = {};
-    if (req.user.role === 'student') {
+    if (applicantRoles.includes(req.user.role)) {
       filter.student = req.user._id || req.user.id;
     } else {
+      if (req.user.role === "admin" && !req.user.division) {
+        return res.status(403).json({ error: "Admin is not assigned to a division." });
+      }
+
       // For admin and super-admin, allow filtering by bootcamp
       if (req.query.bootcampId) {
         filter.bootcamp = req.query.bootcampId;
@@ -138,7 +169,7 @@ export const getApplications = async (req, res) => {
         }
       }
     }
-    const applications = await fetchApplicationsRepo(filter, req.user.role === 'admin' && !req.query.bootcampId ? req.user.division : null);
+    const applications = await fetchApplicationsRepo(filter, req.user.role === 'admin' ? req.user.division : null);
     res.status(200).json({ success: true, count: applications.length, data: applications });
   } catch (error) {
     console.error('DEBUG: getApplications Error ->', error);
@@ -160,6 +191,11 @@ export const getApplication = async (req, res) => {
     
     if (!isStaff && studentId.toString() !== currentUserId.toString()) {
       return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (req.user.role === "admin") {
+      const allowed = await canManageBootcamp(application.bootcamp?._id || application.bootcamp, req.user);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
     }
 
     res.status(200).json({ success: true, data: application });

@@ -47,10 +47,10 @@ router.get("/", restrictTo("super-admin", "admin"), getApplications);
 router.patch("/:applicationId/decision", restrictTo("super-admin", "admin"), makeDecision);
 
 // ─── Student: Application Submission ─────────────────────────────────────────
-router.get("/my-applications", restrictTo("student"), getApplications);
-router.post("/apply", restrictTo("student"), apply);
-router.post("/application-submit", restrictTo("student"), submitTechnicalTask);
-router.post("/waitlist-application-submit", restrictTo("student"), submitWaitlistTask);
+router.get("/my-applications", restrictTo("student", "instructor"), getApplications);
+router.post("/apply", restrictTo("student", "instructor"), apply);
+router.post("/application-submit", restrictTo("student", "instructor"), submitTechnicalTask);
+router.post("/waitlist-application-submit", restrictTo("student", "instructor"), submitWaitlistTask);
 
 // Single Application Fetch (Both Admin and Student)
 // Keep at bottom to avoid catching specific routes like /my-applications
