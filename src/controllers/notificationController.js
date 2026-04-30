@@ -4,9 +4,18 @@ import Notification from "../models/Notification.js";
 // @route   GET /api/v1/notifications
 export const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ user: req.user.id })
+    const { status, type, limit = 50 } = req.query;
+    const query = { user: req.user.id };
+
+    if (status === 'unread') query.isRead = false;
+    if (status === 'read') query.isRead = true;
+    if (type) query.type = type;
+
+    const safeLimit = Math.min(Number(limit) || 50, 100);
+    const notifications = await Notification.find(query)
+      .populate('announcementId', 'title audience division createdAt')
       .sort("-createdAt")
-      .limit(20);
+      .limit(safeLimit);
     res.status(200).json({ success: true, count: notifications.length, data: notifications });
   } catch (error) {
     res.status(500).json({ error: error.message });
