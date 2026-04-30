@@ -1,5 +1,5 @@
 import express from "express";
-import { getAttendance, markAttendance, generateAttendanceQR, scanQRCode } from "../controllers/attendanceController.js";
+import { getAttendance, markAttendance, submitAttendance, generateAttendanceQR, scanQRCode } from "../controllers/attendanceController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
 import { bootcampGuard } from "../middlewares/bootcampGuard.js";
@@ -14,6 +14,7 @@ router.get("/qr-token/:sessionId", restrictTo("super-admin", "admin", "instructo
 router.post("/scan", restrictTo("student"), scanQRCode);
 
 router.post("/mark", restrictTo("super-admin", "admin", "instructor"), markAttendance);
+router.post("/submit", restrictTo("super-admin", "admin", "instructor"), submitAttendance);
 router.get("/", getAttendance);
 
 export default router;

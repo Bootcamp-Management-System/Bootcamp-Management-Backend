@@ -250,21 +250,12 @@ export const getResourcesBySession = async (session_id, user) => {
 };
 
 export const getDownloadableResource = async (resource_id, user) => {
-  const resource = await Resource.findById(resource_id).populate("division_id", "name");
+  const resource = await Resource.findById(resource_id).populate("bootcamp_id", "name division");
 
   if (!resource) {
     const err = new Error("Resource not found");
     err.statusCode = 404;
     throw err;
-  }
-
-  if (user.role !== "super-admin") {
-    const bootcamp = await Bootcamp.findById(resource.bootcamp_id);
-    if (resource.visibility !== "public" && user.division?.toString() !== bootcamp.division.toString()) {
-      const err = new Error("You don't have permission to download this resource.");
-      err.statusCode = 403;
-      throw err;
-    }
   }
 
   const absolutePath = path.join(process.cwd(), resource.file_url.replace(/^\//, ""));
