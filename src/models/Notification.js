@@ -27,6 +27,10 @@ const notificationSchema = new mongoose.Schema(
     link: {
       type: String, // Optional link to the specific resource
     },
+    announcementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Announcement",
+    },
   },
   { timestamps: true }
 );
