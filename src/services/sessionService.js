@@ -12,6 +12,8 @@ const notifyStudents = async (session) => {
   
   const studentNotifications = enrollments.map(async (e) => {
     const student = e.student;
+    if (!student) return; // Prevent crash if student account was deleted but enrollment remains
+    
     // 1. In-App
     await Notification.create({
       user: student._id,
