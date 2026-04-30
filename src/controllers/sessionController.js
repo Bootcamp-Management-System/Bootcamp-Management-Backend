@@ -61,7 +61,7 @@ export const getAvailableInstructors = async (req, res) => {
     const { divisionId } = req.params;
     if (!divisionId) return res.status(400).json({ error: "divisionId is required" });
     
-    const instructors = await sessionService.getAvailableInstructors(divisionId, req.user);
+    const instructors = await sessionService.getAvailableInstructors(divisionId, req.user, req.query);
     res.status(200).json({ success: true, count: instructors.length, data: instructors });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });

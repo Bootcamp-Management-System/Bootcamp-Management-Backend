@@ -54,8 +54,8 @@ export const createUser = async (userData, creatorUser) => {
   // Map divisions to memberships
   const memberships = divisionList.map(divId => ({
     division: divId,
-    isMember: is_Member || role === 'admin' ? true : false,
-    isInstructor: role === 'admin' ? true : false
+    isMember: is_Member || role === 'admin' || role === 'instructor' ? true : false,
+    isInstructor: role === 'admin' || role === 'instructor' ? true : false
   }));
 
   const user = await User.create({
@@ -165,7 +165,29 @@ export const createUser = async (userData, creatorUser) => {
     if (email) user.email = email;
     if (name) user.name = name;
     if (role) user.role = role;
-    if (division) user.division = division;
+    if (division) {
+      user.division = division;
+
+      if (user.role === "instructor") {
+        const hasAssignedDivision = user.assignedDivisions.some(
+          (assignedDivision) => assignedDivision.toString() === division.toString()
+        );
+        if (!hasAssignedDivision) {
+          user.assignedDivisions.push(division);
+        }
+
+        const membership = user.memberships.find(
+          (item) => item.division.toString() === division.toString()
+        );
+
+        if (membership) {
+          membership.isMember = true;
+          membership.isInstructor = true;
+        } else {
+          user.memberships.push({ division, isMember: true, isInstructor: true });
+        }
+      }
+    }
     if (is_Member !== undefined) user.is_Member = is_Member;
     if (updateData.firstLogin !== undefined) user.firstLogin = updateData.firstLogin;
     if (updateData.motivation) user.motivation = updateData.motivation;

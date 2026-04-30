@@ -48,6 +48,39 @@ const notifyInstructor = async (session) => {
   await EmailService.sendInstructorAssignment(instructor.email, session);
 };
 
+const getInstructorConflict = async ({ instructor, start, end, excludeSessionId }) => {
+  if (!instructor || !start || !end) return null;
+
+  const conflictFilter = {
+    instructor,
+    startTime: { $lt: end },
+    endTime: { $gt: start },
+  };
+
+  if (excludeSessionId) {
+    conflictFilter._id = { $ne: excludeSessionId };
+  }
+
+  return Session.findOne(conflictFilter);
+};
+
+const isInstructorForDivision = (user, divisionId) => {
+  const targetDivision = divisionId?.toString();
+  if (!user || !targetDivision) return false;
+
+  const hasInstructorMembership = user.memberships?.some((membership) =>
+    membership.division?.toString() === targetDivision && membership.isInstructor === true
+  );
+
+  const hasAssignedDivision = user.assignedDivisions?.some((division) =>
+    division?.toString() === targetDivision
+  );
+
+  const hasPrimaryDivision = user.division?.toString() === targetDivision;
+
+  return user.role === "instructor" && (hasInstructorMembership || hasAssignedDivision || hasPrimaryDivision);
+};
+
 export const createSession = async (sessionData) => {
   const { title, description, bootcamp, division, instructor, location, meetingLink, startTime, endTime } = sessionData;
 
@@ -88,21 +121,15 @@ export const createSession = async (sessionData) => {
       throw err;
     }
 
-    // Ensure the assigned user is a division instructor, a global instructor, or an admin
-    const isDivisionInstructor = instructorExists.memberships.some(m => 
-      m.division.toString() === divisionId.toString() && m.isInstructor === true
-    );
-    const isGlobalInstructor = instructorExists.role === 'instructor';
-    const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
-
-    if (!isDivisionInstructor && !isGlobalInstructor && !isGlobalAdmin) {
-      const err = new Error("Selected user is not an authorized instructor for this session.");
+    if (!isInstructorForDivision(instructorExists, divisionId)) {
+      const err = new Error("Selected user is not an instructor for this division.");
       err.statusCode = 403;
       throw err;
     }
 
-    if (instructorExists.is_Mentoring) {
-      const err = new Error("Instructor is currently assigned to another active session (Conflict)");
+    const instructorConflict = await getInstructorConflict({ instructor, start, end });
+    if (instructorConflict) {
+      const err = new Error("Instructor already has a session scheduled at this date and time.");
       err.statusCode = 409;
       throw err;
     }
@@ -147,10 +174,6 @@ export const createSession = async (sessionData) => {
     startTime: start,
     endTime: end,
   });
-
-  if (instructor) {
-    await User.findByIdAndUpdate(instructor, { is_Mentoring: true });
-  }
 
   // Trigger Notifications
   notifyStudents(session).catch(err => console.error("Notification failed", err));
@@ -250,37 +273,37 @@ export const updateSession = async (id, updateData, actor) => {
     updateData.completedAt = new Date();
   }
 
-  // If instructor is being updated, validate division and mentoring status
+  const nextStart = updateData.startTime ? new Date(updateData.startTime) : sessionToUpdate.startTime;
+  const nextEnd = updateData.endTime ? new Date(updateData.endTime) : sessionToUpdate.endTime;
+  const nextInstructor = updateData.instructor || sessionToUpdate.instructor;
+
+  if (nextInstructor && nextStart && nextEnd) {
+    const instructorConflict = await getInstructorConflict({
+      instructor: nextInstructor,
+      start: nextStart,
+      end: nextEnd,
+      excludeSessionId: id,
+    });
+
+    if (instructorConflict) {
+      const err = new Error("Instructor already has a session scheduled at this date and time.");
+      err.statusCode = 409;
+      throw err;
+    }
+  }
+
+  // If instructor is being updated, validate division access
   if (updateData.instructor && updateData.instructor.toString() !== sessionToUpdate.instructor?.toString()) {
     const instructorExists = await User.findById(updateData.instructor);
     const sessionBootcamp = await Bootcamp.findById(sessionToUpdate.bootcamp);
     const divisionId = sessionBootcamp.division;
 
-    // Ensure the assigned user is a division instructor, a global instructor, or an admin
-    const isDivisionInstructor = instructorExists.memberships.some(m => 
-      m.division.toString() === divisionId.toString() && m.isInstructor === true
-    );
-    const isGlobalInstructor = instructorExists.role === 'instructor';
-    const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
-
-    if (!isDivisionInstructor && !isGlobalInstructor && !isGlobalAdmin) {
-      const err = new Error("Selected user is not an authorized instructor for this session.");
+    if (!isInstructorForDivision(instructorExists, divisionId)) {
+      const err = new Error("Selected user is not an instructor for this division.");
       err.statusCode = 403;
       throw err;
     }
 
-    if (instructorExists.is_Mentoring) {
-      const err = new Error("Instructor is currently assigned to another active session (Conflict)");
-      err.statusCode = 409;
-      throw err;
-    }
-
-    // Release old instructor
-    if (sessionToUpdate.instructor) {
-      await User.findByIdAndUpdate(sessionToUpdate.instructor, { is_Mentoring: false });
-    }
-    // Lock new instructor
-    await User.findByIdAndUpdate(updateData.instructor, { is_Mentoring: true });
   }
 
   const session = await Session.findByIdAndUpdate(id, updateData, {
@@ -328,16 +351,13 @@ export const deleteSession = async (id) => {
     throw err;
   }
 
-  if (session.instructor) {
-    await User.findByIdAndUpdate(session.instructor, { is_Mentoring: false });
-  }
-
   await Session.findByIdAndDelete(id);
   return session;
 };
 
-export const getAvailableInstructors = async (divisionId, currentUser) => {
-  // Find division instructors, global instructors, or the admin themselves
+export const getAvailableInstructors = async (divisionId, currentUser, options = {}) => {
+  const { startTime, endTime, sessionId } = options;
+  // Find instructors explicitly connected to this division.
   const query = {
     $or: [
       {
@@ -348,15 +368,33 @@ export const getAvailableInstructors = async (divisionId, currentUser) => {
           }
         }
       },
-      { role: 'instructor' },
-      { _id: currentUser._id }
+      { role: "instructor", assignedDivisions: divisionId },
+      { role: "instructor", division: divisionId },
     ],
-    is_Mentoring: { $ne: true } // Not currently assigned to another session
   };
 
   const instructors = await User.find(query)
   .select('name email campusId motivation dedication memberships role')
   .populate('memberships.division', 'name');
 
-  return instructors;
+  if (!startTime || !endTime) {
+    return instructors;
+  }
+
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return instructors;
+  }
+
+  const conflicts = await Session.find({
+    instructor: { $in: instructors.map((instructor) => instructor._id) },
+    startTime: { $lt: end },
+    endTime: { $gt: start },
+    ...(sessionId ? { _id: { $ne: sessionId } } : {}),
+  }).select("instructor");
+
+  const conflictedInstructorIds = new Set(conflicts.map((session) => session.instructor?.toString()));
+  return instructors.filter((instructor) => !conflictedInstructorIds.has(instructor._id.toString()));
 };
