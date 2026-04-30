@@ -86,6 +86,8 @@ export const verifyOtp = async (email, otp, newPassword) => {
       role: user.role, 
       name: user.name,
       division: user.division,
+      is_Member: user.is_Member || user.memberships?.some(m => m.isMember),
+      memberships: user.memberships || [],
       firstLogin: user.firstLogin
     }
   };
@@ -136,11 +138,7 @@ export const loginUser = async (email, password) => {
     throw new Error("Please verify your email address before logging in.");
   }
 
-  const token = generateToken(user._id, user.tokenVersion || 0);
-  const refreshToken = generateRefreshToken(user._id);
-
-  const isGlobalMember = user.memberships.some(m => m.isMember);
-  const isGlobalInstructor = user.memberships.some(m => m.isInstructor);
+  const isGlobalMember = user.is_Member || user.memberships.some(m => m.isMember);
 
   return {
     token,
@@ -150,9 +148,8 @@ export const loginUser = async (email, password) => {
       role: user.role, 
       name: user.name,
       division: user.division,
-      memberships: user.memberships,
-      isMember: isGlobalMember,
-      isInstructor: isGlobalInstructor,
+      memberships: user.memberships || [],
+      is_Member: isGlobalMember,
       firstLogin: user.firstLogin
     }
   };
