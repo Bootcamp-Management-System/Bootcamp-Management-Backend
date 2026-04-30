@@ -86,15 +86,15 @@ export const createSession = async (sessionData) => {
       throw err;
     }
 
-    // Check if user is a MEMBER of this division (being a member is sufficient to be instructor)
-    const membership = instructorExists.memberships.find(m => 
-      m.division.toString() === divisionId.toString() && m.isMember === true
+    // Ensure the assigned user is a division instructor, a global instructor, or an admin
+    const isDivisionInstructor = instructorExists.memberships.some(m => 
+      m.division.toString() === divisionId.toString() && m.isInstructor === true
     );
-    const isDivisionMember = !!membership;
+    const isGlobalInstructor = instructorExists.role === 'instructor';
     const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
 
-    if (!isDivisionMember && !isGlobalAdmin) {
-      const err = new Error("Instructor must be a member of this division");
+    if (!isDivisionInstructor && !isGlobalInstructor && !isGlobalAdmin) {
+      const err = new Error("Selected user is not an authorized instructor for this session.");
       err.statusCode = 403;
       throw err;
     }
@@ -191,14 +191,15 @@ export const updateSession = async (id, updateData) => {
     const sessionBootcamp = await Bootcamp.findById(sessionToUpdate.bootcamp);
     const divisionId = sessionBootcamp.division;
 
-    const membership = instructorExists.memberships.find(m => 
-      m.division.toString() === divisionId.toString() && m.isMember === true
+    // Ensure the assigned user is a division instructor, a global instructor, or an admin
+    const isDivisionInstructor = instructorExists.memberships.some(m => 
+      m.division.toString() === divisionId.toString() && m.isInstructor === true
     );
-    const isDivisionMember = !!membership;
+    const isGlobalInstructor = instructorExists.role === 'instructor';
     const isGlobalAdmin = ["super-admin", "admin"].includes(instructorExists.role);
 
-    if (!isDivisionMember && !isGlobalAdmin) {
-      const err = new Error("Instructor must be a member of this division");
+    if (!isDivisionInstructor && !isGlobalInstructor && !isGlobalAdmin) {
+      const err = new Error("Selected user is not an authorized instructor for this session.");
       err.statusCode = 403;
       throw err;
     }
@@ -246,17 +247,25 @@ export const deleteSession = async (id) => {
   return session;
 };
 
-export const getAvailableInstructors = async (divisionId) => {
-  // Find users who are members of this division (being a member is sufficient to be instructor)
-  const instructors = await User.find({
-    'memberships': {
-      $elemMatch: {
-        division: divisionId,
-        isMember: true
-      }
-    },
-    is_Mentoring: false // Not currently assigned to another session
-  })
+export const getAvailableInstructors = async (divisionId, currentUser) => {
+  // Find division instructors, global instructors, or the admin themselves
+  const query = {
+    $or: [
+      {
+        'memberships': {
+          $elemMatch: {
+            division: divisionId,
+            isInstructor: true
+          }
+        }
+      },
+      { role: 'instructor' },
+      { _id: currentUser._id }
+    ],
+    is_Mentoring: { $ne: true } // Not currently assigned to another session
+  };
+
+  const instructors = await User.find(query)
   .select('name email campusId motivation dedication memberships role')
   .populate('memberships.division', 'name');
 

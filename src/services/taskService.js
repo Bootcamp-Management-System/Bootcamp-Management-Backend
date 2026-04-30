@@ -1,5 +1,6 @@
 import Task from "../models/Task.js";
 import Session from "../models/Session.js";
+import Enrollment from "../models/Enrollment.js";
 
 export const createTask = async (taskData, creator) => {
   const { title, description, startTime, endTime, deadline, session } = taskData;
@@ -63,8 +64,18 @@ export const getTasks = async (user, queryData) => {
     filter.bootcamp = queryData.bootcamp;
   }
 
-  // user.division check is removed for students because bootcampGuard handles filtering
-  // Admins can pass bootcamp in queryData, which is handled above.
+  if (user.role === 'student') {
+    const activeEnrollments = await Enrollment.find({ student: user._id || user.id, is_active: true });
+    const enrolledBootcampIds = activeEnrollments.map(e => e.bootcamp);
+    
+    if (filter.bootcamp) {
+      if (!enrolledBootcampIds.some(id => id.toString() === filter.bootcamp.toString())) {
+        return []; 
+      }
+    } else {
+      filter.bootcamp = { $in: enrolledBootcampIds };
+    }
+  }
 
   const tasks = await Task.find(filter)
     .populate("bootcamp", "name")
