@@ -20,7 +20,7 @@ const notifyStudents = async (session) => {
       title: `New Session: ${session.title}`,
       message: `A new session has been scheduled for ${new Date(session.startTime).toLocaleString()}.`,
       type: "SESSION",
-      link: `/dashboard/sessions/${session._id}`
+      link: `/sessions/${session._id}`
     });
 
     // 2. Email + Calendar
@@ -41,7 +41,7 @@ const notifyInstructor = async (session) => {
     title: `New Assignment: ${session.title}`,
     message: `You have been assigned to lead the session "${session.title}" on ${new Date(session.startTime).toLocaleString()}.`,
     type: "ASSIGNMENT",
-    link: `/dashboard/sessions/${session._id}`
+    link: `/instructor/sessions/${session._id}`
   });
 
   // 2. Email + Calendar
@@ -172,19 +172,82 @@ export const getSessions = async (user, queryData) => {
     filter.instructor = user._id;
   }
 
+  if (user.role === "student") {
+    const activeEnrollments = await Enrollment.find({ student: user._id || user.id, is_active: true }).select("bootcamp");
+    filter.bootcamp = { $in: activeEnrollments.map((enrollment) => enrollment.bootcamp) };
+  }
+
+  if (queryData.division) {
+    filter.division = queryData.division;
+  }
+
   const sessions = await Session.find(filter)
-    .populate("instructor", "email role")
-    .populate("bootcamp", "name");
+    .populate("instructor", "name email role")
+    .populate("bootcamp", "name")
+    .populate("division", "name")
+    .sort({ startTime: -1 });
   
   return sessions;
 };
 
-export const updateSession = async (id, updateData) => {
+export const getSessionById = async (id, user) => {
+  const session = await Session.findById(id)
+    .populate("instructor", "name email role")
+    .populate("bootcamp", "name")
+    .populate("division", "name");
+
+  if (!session) {
+    const err = new Error("Session not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (user.role === "instructor" && session.instructor?._id?.toString() !== user._id.toString()) {
+    const err = new Error("You can only view sessions assigned to you.");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (user.role === "student") {
+    const enrollment = await Enrollment.findOne({
+      student: user._id || user.id,
+      bootcamp: session.bootcamp?._id || session.bootcamp,
+      is_active: true,
+    });
+
+    if (!enrollment) {
+      const err = new Error("You can only view sessions for bootcamps you are enrolled in.");
+      err.statusCode = 403;
+      throw err;
+    }
+  }
+
+  return session;
+};
+
+export const updateSession = async (id, updateData, actor) => {
   const sessionToUpdate = await Session.findById(id);
   if (!sessionToUpdate) {
     const err = new Error("Session not found");
     err.statusCode = 404;
     throw err;
+  }
+
+  if (actor?.role === "instructor" && sessionToUpdate.instructor?.toString() !== (actor._id || actor.id)?.toString()) {
+    const err = new Error("You can only update sessions assigned to you.");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (actor?.role === "instructor") {
+    const allowedInstructorFields = ["description", "location", "meetingLink", "status", "completedAt"];
+    updateData = Object.fromEntries(
+      Object.entries(updateData).filter(([key]) => allowedInstructorFields.includes(key))
+    );
+  }
+
+  if (updateData.status === "completed" && !updateData.completedAt) {
+    updateData.completedAt = new Date();
   }
 
   // If instructor is being updated, validate division and mentoring status
@@ -228,6 +291,30 @@ export const updateSession = async (id, updateData) => {
   // If instructor was changed, notify the NEW instructor
   if (updateData.instructor && updateData.instructor.toString() !== sessionToUpdate.instructor?.toString()) {
      notifyInstructor(session).catch(err => console.error("Instructor Notification failed", err));
+  }
+
+  const didPublishDetails = ["description", "location", "meetingLink", "status"].some(
+    (field) => Object.prototype.hasOwnProperty.call(updateData, field)
+  );
+
+  if (didPublishDetails) {
+    const enrollments = await Enrollment.find({ bootcamp: session.bootcamp, is_active: true }).select("student");
+    const title = session.status === "completed" ? `Session ended: ${session.title}` : `Session updated: ${session.title}`;
+    const message = session.status === "completed"
+      ? "The instructor ended this session. Please check the session page for follow-up items."
+      : "The instructor updated the session details, resources, or meeting information.";
+
+    await Notification.insertMany(
+      enrollments
+        .filter((enrollment) => enrollment.student)
+        .map((enrollment) => ({
+          user: enrollment.student,
+          title,
+          message,
+          type: "SESSION",
+          link: `/sessions/${session._id}`,
+        }))
+    );
   }
 
   return session;

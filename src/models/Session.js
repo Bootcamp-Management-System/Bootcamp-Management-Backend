@@ -39,6 +39,14 @@ const sessionSchema = new mongoose.Schema(
       type: Date,
       required: [true, "End time is required"],
     },
+    status: {
+      type: String,
+      enum: ["scheduled", "ready", "completed"],
+      default: "scheduled",
+    },
+    completedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );

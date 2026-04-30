@@ -1,6 +1,7 @@
 import Task from "../models/Task.js";
 import Session from "../models/Session.js";
 import Enrollment from "../models/Enrollment.js";
+import Notification from "../models/Notification.js";
 
 export const createTask = async (taskData, creator) => {
   const { title, description, startTime, endTime, deadline, session } = taskData;
@@ -54,6 +55,19 @@ export const createTask = async (taskData, creator) => {
     createdBy: creator._id || creator.id
   });
 
+  const enrollments = await Enrollment.find({ bootcamp, is_active: true }).select("student");
+  await Notification.insertMany(
+    enrollments
+      .filter((enrollment) => enrollment.student)
+      .map((enrollment) => ({
+        user: enrollment.student,
+        title: `New Task: ${task.title}`,
+        message: `A new task has been posted${session ? " for your session" : ""}. Deadline: ${new Date(deadline).toLocaleString()}.`,
+        type: "TASK",
+        link: "/my-tasks",
+      }))
+  );
+
   return task;
 };
 
@@ -62,6 +76,10 @@ export const getTasks = async (user, queryData) => {
 
   if (queryData.bootcamp) {
     filter.bootcamp = queryData.bootcamp;
+  }
+
+  if (queryData.session) {
+    filter.session = queryData.session;
   }
 
   if (user.role === 'student') {

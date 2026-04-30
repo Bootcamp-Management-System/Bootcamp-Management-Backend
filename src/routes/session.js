@@ -1,5 +1,5 @@
 import express from "express";
-import { createSession, getSessions, updateSession, deleteSession, assignInstructor, getAvailableInstructors } from "../controllers/sessionController.js";
+import { createSession, getSessions, getSessionById, updateSession, deleteSession, assignInstructor, getAvailableInstructors } from "../controllers/sessionController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
 import { checkDivisionAccess } from "../middlewares/divisionGuard.js";
@@ -15,6 +15,7 @@ router.route("/")
   .get(getSessions);
 
 router.route("/:id")
+  .get(getSessionById)
   .patch(restrictTo("super-admin", "admin", "instructor"), updateSession)
   .delete(restrictTo("super-admin", "admin"), deleteSession);
 

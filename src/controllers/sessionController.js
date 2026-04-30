@@ -18,6 +18,15 @@ export const getSessions = async (req, res) => {
   }
 };
 
+export const getSessionById = async (req, res) => {
+  try {
+    const session = await sessionService.getSessionById(req.params.id, req.user);
+    res.status(200).json({ success: true, data: session });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
+  }
+};
+
 export const deleteSession = async (req, res) => {
   try {
     await sessionService.deleteSession(req.params.id);
@@ -29,7 +38,7 @@ export const deleteSession = async (req, res) => {
 
 export const updateSession = async (req, res) => {
   try {
-    const session = await sessionService.updateSession(req.params.id, req.body);
+    const session = await sessionService.updateSession(req.params.id, req.body, req.user);
     res.status(200).json({ success: true, data: session });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
@@ -40,7 +49,7 @@ export const assignInstructor = async (req, res) => {
   try {
     const { instructorId } = req.body;
     if (!instructorId) return res.status(400).json({ error: "instructorId is required" });
-    const session = await sessionService.updateSession(req.params.id, { instructor: instructorId });
+    const session = await sessionService.updateSession(req.params.id, { instructor: instructorId }, req.user);
     res.status(200).json({ success: true, data: session });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
