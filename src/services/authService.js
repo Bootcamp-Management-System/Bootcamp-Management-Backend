@@ -45,10 +45,8 @@ export const signupUser = async (userData) => {
 
   try {
     await EmailService.sendVerificationEmail(user.email, otpCode);
-    console.log(`✅ Verification email sent to ${user.email}`);
   } catch (error) {
     console.error('❌ Email Service Error:', error.message);
-    console.log(`⚠️ For testing: OTP for ${user.email} is: ${otpCode}`);
   }
 
   return { 
@@ -106,10 +104,8 @@ export const resendOtp = async (email) => {
 
   try {
     await EmailService.sendVerificationEmail(user.email, otpCode);
-    console.log(`✅ Verification email resent to ${user.email}`);
   } catch (error) {
     console.error('❌ Email Service Error:', error.message);
-    console.log(`⚠️ For testing: OTP for ${user.email} is: ${otpCode}`);
   }
 
   return { 
@@ -122,7 +118,9 @@ export const loginUser = async (email, password) => {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await User.findOne({ email: normalizedEmail }).populate('division');
   
-  if (!user) throw new Error("Invalid email or password");
+  if (!user) {
+    throw new Error("Invalid email or password");
+  }
 
   // Check if password is a hash. Bcrypt hashes start with $2
   const isHash = user.password.startsWith('$2');
@@ -139,6 +137,9 @@ export const loginUser = async (email, password) => {
   }
 
   const isGlobalMember = user.is_Member || user.memberships.some(m => m.isMember);
+
+  const token = generateToken(user._id, user.tokenVersion || 0);
+  const refreshToken = generateRefreshToken(user._id);
 
   return {
     token,

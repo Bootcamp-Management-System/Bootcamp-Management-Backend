@@ -115,14 +115,27 @@ export const getApplications = async (req, res) => {
       if (req.query.status) {
         filter.status = req.query.status;
       }
-      // For admin, also filter by division if no specific bootcamp
-      if (req.user.role === 'admin' && !req.query.bootcampId) {
-        // Filter will be handled in service
-      }
     }
-    // super-admin sees all
     const applications = await recruitmentService.fetchApplicationsRepo(filter, req.user.role === 'admin' && !req.query.bootcampId ? req.user.division : null);
     res.status(200).json({ success: true, count: applications.length, data: applications });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getApplication = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const application = await recruitmentService.fetchApplicationByIdRepo(applicationId);
+    
+    if (!application) return res.status(404).json({ error: "Application not found" });
+
+    // Security: Students can only see their own application
+    if (req.user.role === 'student' && application.student._id.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.status(200).json({ success: true, data: application });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

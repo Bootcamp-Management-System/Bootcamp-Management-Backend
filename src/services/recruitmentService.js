@@ -122,7 +122,7 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
     if (app.status !== 'PENDING') throw new Error("Only PENDING apps can be passed to the next round.");
     nextStatus = 'SCREENED_ROUND_1';
     app.phase2Submission.taskLinkSent = true;
-    await EmailService.sendPhase2TaskEmail(student.email, app.bootcampApplied);
+    await EmailService.sendPhase2TaskEmail(student.email, app.bootcampApplied, app._id);
   }
 
   else if (decision === 'REJECT') {
@@ -200,4 +200,16 @@ export const fetchApplicationsRepo = async (filter, adminDivision = null) => {
   }
 
   return await query;
+};
+export const fetchApplicationByIdRepo = async (id) => {
+  return await Application.findById(id)
+    .populate('student', 'email name')
+    .populate({
+      path: 'bootcamp',
+      select: 'name division',
+      populate: {
+        path: 'division',
+        select: 'name'
+      }
+    });
 };

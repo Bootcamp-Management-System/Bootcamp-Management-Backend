@@ -19,7 +19,6 @@ class EmailService {
   static async verifyConnection() {
     try {
       await this.getTransporter().verify();
-      console.log('✅ Email service connected successfully');
     } catch (error) {
       console.error('❌ Email service connection failed:', error.message);
     }
@@ -27,8 +26,6 @@ class EmailService {
 
   static async sendEmail(options) {
     try {
-      console.log(`📧 Attempting to send email to ${options.to} with subject: ${options.subject}`);
-      
       const mailOptions = {
         from: `"BMS Portal" <${process.env.EMAIL_USER}>`,
         to: options.to,
@@ -36,11 +33,7 @@ class EmailService {
         html: options.html,
       };
 
-      console.log('📧 Mail options:', { from: mailOptions.from, to: mailOptions.to, subject: mailOptions.subject });
-      
       const result = await this.getTransporter().sendMail(mailOptions);
-      console.log(`✅ Email sent successfully to ${options.to}. Message ID: ${result.messageId}`);
-      
       return result;
     } catch (error) {
       console.error("❌ Email Dispatch Failed:", error.message);
@@ -72,16 +65,19 @@ class EmailService {
   }
 
   // 2. Phase 2: Selection for Technical Task
-  static async sendPhase2TaskEmail(email, divisionName) {
+  static async sendPhase2TaskEmail(email, divisionName, applicationId) {
     const html = `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #2563eb;">Waitlist: Additional Requirements ⏳</h2>
-        <p>Your application for <strong>${divisionName}</strong> has been added to the waiting list.</p>
-        <p><strong>Additional Requirement:</strong> We have assigned you a new task to evaluate your skills further. Please complete it in your dashboard.</p>
-        <p><a href="http://localhost:5173/dashboard" style="padding: 10px 15px; background: #0f172a; color: white; text-decoration: none; border-radius: 5px;">View New Task</a></p>
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Round Two: Technical Screening 🚀</h2>
+        <p>Congratulations! Your initial application for <strong>${divisionName}</strong> has been accepted for the next stage.</p>
+        <p><strong>Your Task:</strong> To evaluate your technical skills, we have assigned you a specific task. Please complete it and submit your work through the portal.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="http://localhost:5173/recruitment/submit/${applicationId}" style="display: inline-block; background: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Submit Technical Task</a>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">If you cannot click the button, copy and paste this link: http://localhost:5173/recruitment/submit/${applicationId}</p>
       </div>
     `;
-    await this.sendEmail({ to: email, subject: "Round Two: Technical Task - Bootcamp Selection", html });
+    await this.sendEmail({ to: email, subject: `Action Required: Technical Task for ${divisionName}`, html });
   }
 
   // 3. Final Acceptance (Platinum Email)

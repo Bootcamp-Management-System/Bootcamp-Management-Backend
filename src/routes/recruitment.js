@@ -8,7 +8,8 @@ import {
   submitTechnicalTask,
   submitWaitlistTask,
   makeDecision,
-  getApplications
+  getApplications,
+  getApplication
 } from "../controllers/recruitmentController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
@@ -43,6 +44,7 @@ router.get("/template/:bootcampId", getTemplate);
 
 // ─── Admin: Application Viewing & Decisions ──────────────────────────────────
 router.get("/", restrictTo("super-admin", "admin"), getApplications);
+router.get("/:applicationId", getApplication);
 router.patch("/:applicationId/decision", restrictTo("super-admin", "admin"), makeDecision);
 
 // ─── Student: Application Submission ─────────────────────────────────────────
