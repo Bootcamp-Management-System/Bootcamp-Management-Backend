@@ -21,10 +21,6 @@ export const loginUser = async (req, res) => {
       user: result.user
     });
   } catch (error) {
-    console.error(`🔥 [LOGIN ERROR]: ${error.message}`);
-    if (error.stack && error.name !== 'Error') {
-      console.error(error.stack);
-    }
     res.status(401).json({ success: false, message: error.message });
   }
 };

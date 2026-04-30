@@ -1,11 +1,22 @@
-import * as recruitmentService from "../services/recruitmentService.js";
+import {
+  createOrUpdateTemplateRepo,
+  publishTemplateRepo,
+  unpublishTemplateRepo,
+  getTemplateByBootcampRepo,
+  applyToBootcampRepo,
+  submitTechnicalTaskRepo,
+  submitWaitlistTaskRepo,
+  handleAdminDecisionRepo,
+  fetchApplicationsRepo,
+  fetchApplicationByIdRepo
+} from "../services/recruitmentService.js";
 
 // ─── ADMIN: Template Management ──────────────────────────────────────────────
 
 export const createOrUpdateTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
-    const template = await recruitmentService.createOrUpdateTemplateRepo(bootcampId, req.body, req.user.id);
+    const template = await createOrUpdateTemplateRepo(bootcampId, req.body, req.user.id);
     res.status(200).json({ success: true, message: "Template saved", data: template });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -15,7 +26,7 @@ export const createOrUpdateTemplate = async (req, res) => {
 export const publishTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
-    const template = await recruitmentService.publishTemplateRepo(bootcampId, req.user.id);
+    const template = await publishTemplateRepo(bootcampId, req.user.id);
     res.status(200).json({ success: true, message: "Application form is now LIVE for students", data: template });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -25,7 +36,7 @@ export const publishTemplate = async (req, res) => {
 export const unpublishTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
-    const template = await recruitmentService.unpublishTemplateRepo(bootcampId, req.user.id);
+    const template = await unpublishTemplateRepo(bootcampId, req.user.id);
     res.status(200).json({ success: true, message: "Application form hidden from students", data: template });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -35,7 +46,7 @@ export const unpublishTemplate = async (req, res) => {
 export const getTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
-    const template = await recruitmentService.getTemplateByBootcampRepo(bootcampId);
+    const template = await getTemplateByBootcampRepo(bootcampId);
     if (!template) {
       if (req.user.role === 'super-admin' || req.user.role === 'super_admin' || req.user.role === 'admin') {
         return res.status(200).json({
@@ -46,9 +57,16 @@ export const getTemplate = async (req, res) => {
       return res.status(404).json({ error: "No template found for this bootcamp" });
     }
 
-    // Students only see published templates
+    // Students only see published templates, UNLESS they have an existing application
     if (req.user.role === 'student' && !template.isPublished) {
-      return res.status(404).json({ error: "Applications for this bootcamp are not open yet" });
+      const existingApp = await fetchApplicationsRepo({ 
+        student: req.user._id || req.user.id, 
+        bootcamp: bootcampId 
+      });
+      
+      if (!existingApp || existingApp.length === 0) {
+        return res.status(404).json({ error: "Applications for this bootcamp are not open yet" });
+      }
     }
 
     res.status(200).json({ success: true, data: template });
@@ -62,7 +80,7 @@ export const getTemplate = async (req, res) => {
 export const apply = async (req, res) => {
   try {
     const { bootcampId, phase1Answers } = req.body;
-    const application = await recruitmentService.applyToBootcampRepo(req.user.id, bootcampId, phase1Answers);
+    const application = await applyToBootcampRepo(req.user.id, bootcampId, phase1Answers);
     res.status(201).json({ success: true, message: "Application submitted", data: application });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -72,7 +90,7 @@ export const apply = async (req, res) => {
 export const submitTechnicalTask = async (req, res) => {
   try {
     const { applicationId, ...taskData } = req.body;
-    const application = await recruitmentService.submitTechnicalTaskRepo(applicationId, req.user.id, taskData);
+    const application = await submitTechnicalTaskRepo(applicationId, req.user.id, taskData);
     res.status(200).json({ success: true, message: "Technical task submitted", data: application });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -82,7 +100,7 @@ export const submitTechnicalTask = async (req, res) => {
 export const submitWaitlistTask = async (req, res) => {
   try {
     const { applicationId, ...waitlistData } = req.body;
-    const application = await recruitmentService.submitWaitlistTaskRepo(applicationId, req.user.id, waitlistData);
+    const application = await submitWaitlistTaskRepo(applicationId, req.user.id, waitlistData);
     res.status(200).json({ success: true, message: "Waitlist task submitted", data: application });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -94,7 +112,7 @@ export const submitWaitlistTask = async (req, res) => {
 export const makeDecision = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const application = await recruitmentService.handleAdminDecisionRepo(applicationId, req.user.id, req.body);
+    const application = await handleAdminDecisionRepo(applicationId, req.user.id, req.body);
     res.status(200).json({ success: true, message: `Decision '${req.body.decision}' applied`, data: application });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -113,12 +131,17 @@ export const getApplications = async (req, res) => {
       }
       // Allow filtering by status
       if (req.query.status) {
-        filter.status = req.query.status;
+        if (req.query.status === 'TASK_EVALUATION') {
+          filter.status = { $in: ['TASK_EVALUATION', 'WAITLIST_TASK_EVALUATION'] };
+        } else {
+          filter.status = req.query.status;
+        }
       }
     }
-    const applications = await recruitmentService.fetchApplicationsRepo(filter, req.user.role === 'admin' && !req.query.bootcampId ? req.user.division : null);
+    const applications = await fetchApplicationsRepo(filter, req.user.role === 'admin' && !req.query.bootcampId ? req.user.division : null);
     res.status(200).json({ success: true, count: applications.length, data: applications });
   } catch (error) {
+    console.error('DEBUG: getApplications Error ->', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -126,12 +149,16 @@ export const getApplications = async (req, res) => {
 export const getApplication = async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const application = await recruitmentService.fetchApplicationByIdRepo(applicationId);
+    const application = await fetchApplicationByIdRepo(applicationId);
     
     if (!application) return res.status(404).json({ error: "Application not found" });
 
     // Security: Students can only see their own application
-    if (req.user.role === 'student' && application.student._id.toString() !== req.user.id.toString()) {
+    const studentId = application.student._id || application.student;
+    const currentUserId = req.user._id || req.user.id;
+    const isStaff = ['super-admin', 'super_admin', 'admin'].includes(req.user.role);
+    
+    if (!isStaff && studentId.toString() !== currentUserId.toString()) {
       return res.status(403).json({ error: "Access denied" });
     }
 

@@ -159,17 +159,29 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
 
     await EmailService.sendAcceptanceEmail(student.email, otp, app.bootcampApplied);
 
-    // Officially assign the student to the division
+  }
+
+  else if (decision === 'MEMBER') {
+    if (app.status !== 'ACCEPTED') {
+      throw new Error("Only ACCEPTED bootcamp students can be promoted to official Division Members.");
+    }
+    nextStatus = 'MEMBER';
+
+    // Officially assign the student to the division as a full member
     if (app.bootcamp && app.bootcamp.division) {
       student.division = app.bootcamp.division;
-      // Add to memberships if not already there
-      const hasMembership = student.memberships.some(m => m.division.toString() === app.bootcamp.division.toString());
-      if (!hasMembership) {
+      
+      const membership = student.memberships.find(m => m.division.toString() === app.bootcamp.division.toString());
+      if (!membership) {
         student.memberships.push({
           division: app.bootcamp.division,
-          isMember: true // They are now a member of this division's bootcamp
+          isMember: true 
         });
+      } else {
+        membership.isMember = true;
       }
+      
+      student.is_Member = true; // Global flag to unlock Member Hub
       await student.save();
     }
   }

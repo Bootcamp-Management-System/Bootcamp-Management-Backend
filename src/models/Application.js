@@ -25,7 +25,8 @@ const applicationSchema = new mongoose.Schema({
       'WAITLISTED',
       'WAITLIST_TASK_EVALUATION',
       'ACCEPTED',
-      'REJECTED'
+      'REJECTED',
+      'MEMBER'
     ], 
     default: 'PENDING' 
   },
@@ -53,7 +54,7 @@ const applicationSchema = new mongoose.Schema({
   decisionHistory: [{
     decision: { 
       type: String, 
-      enum: ['PASS', 'ACCEPT', 'REJECT', 'WAIT'],
+      enum: ['PASS', 'ACCEPT', 'REJECT', 'WAIT', 'MEMBER'],
       required: true
     },
     admin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
