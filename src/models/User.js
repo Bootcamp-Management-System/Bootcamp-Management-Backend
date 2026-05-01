@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   campusId: { type: String, unique: true, sparse: true }, // Optional for admins, required for students (enforced in logic)
   motivation: { type: String },
   dedication: { type: String },
+  skills: [{ type: String }],
   
   // New Membership-Centric Logic
   memberships: [
