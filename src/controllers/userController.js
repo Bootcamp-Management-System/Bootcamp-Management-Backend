@@ -1,5 +1,33 @@
 import * as userService from "../services/userService.js";
 
+// @desc    Bulk Import Members (Super Admin only)
+// @route   POST /api/v1/users/import-members
+// @access  Private/SuperAdmin
+export const importMembers = async (req, res) => {
+  try {
+    const { members } = req.body;
+    if (!members || !Array.isArray(members)) {
+      return res.status(400).json({ message: "Invalid members list format" });
+    }
+    const results = await userService.importMembers(members);
+    res.status(201).json({ success: true, data: results });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get Global Member Pool (Admins only)
+// @route   GET /api/v1/users/pool
+// @access  Private/Admin
+export const getMemberPool = async (req, res) => {
+  try {
+    const pool = await userService.getMemberPool();
+    res.status(200).json({ success: true, count: pool.length, data: pool });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Create new user (Admin/Super Admin only)
 // @route   POST /api/v1/users
 // @access  Private/Admin
@@ -26,7 +54,14 @@ export const createUser = async (req, res) => {
 // @access  Public (for now) / Admin
 export const getUsers = async (req, res) => {
   try {
-    const users = await userService.getUsers();
+    const filters = {};
+    if (req.user && req.user.role === 'admin') {
+      filters.$or = [
+        { division: req.user.division },
+        { "memberships.division": req.user.division }
+      ];
+    }
+    const users = await userService.getUsers(filters);
     res.status(200).json({
       success: true,
       count: users.length,
@@ -48,7 +83,24 @@ export const promoteUser = async (req, res) => {
       message: `User promoted to ${result.user.role} successfully`,
       userId: result.user._id,
       newRole: result.user.role,
-      tempPassword: result.tempPassRaw 
+      tempPassword: result.tempPassRaw
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
+  }
+};
+
+// @desc    Demote User to a lower role
+// @route   PATCH /users/:id/demote
+// @access  Private (super-admin only)
+export const demoteUser = async (req, res) => {
+  try {
+    const result = await userService.demoteUser(req.params.id, req.body, req.user);
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      userId: result.user._id,
+      newRole: result.user.role
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
@@ -86,6 +138,18 @@ export const updateUser = async (req, res) => {
   try {
     const user = await userService.updateUser(req.params.id, req.body);
     res.status(200).json({ success: true, message: "User updated successfully", data: user });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
+  }
+};
+
+// @desc    Complete onboarding (First login question)
+// @route   POST /api/v1/users/onboarding
+// @access  Private
+export const completeOnboarding = async (req, res) => {
+  try {
+    const user = await userService.completeOnboarding(req.user._id, req.body);
+    res.status(200).json({ success: true, message: "Onboarding completed", data: user });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || "Server Error" });
   }

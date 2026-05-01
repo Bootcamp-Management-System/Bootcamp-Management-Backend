@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import sendEmail from "./emailService.js";
+import EmailService from "./emailService.js";
 
 const generateToken = (id, tokenVersion = 0) => {
   return jwt.sign({ id, tokenVersion }, process.env.JWT_ACCESS_SECRET, {
@@ -16,78 +16,129 @@ const generateRefreshToken = (id) => {
   });
 };
 
-export const loginUser = async (email, password) => {
-  const user = await User.findOne({ email });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    const error = new Error("Invalid email or password");
-    error.statusCode = 401;
-    throw error;
+export const signupUser = async (userData) => {
+  const { email, password, name, campusId, motivation, dedication, division } = userData;
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) throw new Error("Email already registered");
+
+  if (campusId) {
+    const existingId = await User.findOne({ campusId });
+    if (existingId) throw new Error("Campus ID already registered");
   }
 
-  if (user.firstLogin || !user.verified) {
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = { code: otpCode, expiresAt: Date.now() + 10 * 60 * 1000 };
-    await user.save();
+  const hashedPassword = await bcrypt.hash(password, 12);
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    await sendEmail({
-      to: user.email,
-      subject: "Account Verification Required",
-      text: `Welcome back. Please verify your account to continue. Your OTP is ${otpCode}. It expires in 10 minutes.`,
-    });
-    
-    return { verificationRequired: true, message: "Verification required. OTP sent to email." };
+  const user = await User.create({
+    email,
+    password: hashedPassword,
+    name,
+    campusId,
+    motivation,
+    dedication,
+    division,
+    role: 'student',
+    is_EmailVerified: false,
+    otp: { code: otpCode, expiresAt: Date.now() + 15 * 60 * 1000 }
+  });
+
+  try {
+    await EmailService.sendVerificationEmail(user.email, otpCode);
+  } catch (error) {
+    console.error('❌ Email Service Error:', error.message);
   }
-
-  const token = generateToken(user._id, user.tokenVersion || 0);
-  const refreshToken = generateRefreshToken(user._id);
 
   return {
-    verificationRequired: false,
-    token,
-    refreshToken,
-    user: { id: user._id, role: user.role, division: user.division }
+    message: "Signup successful. Please verify your email to continue.",
+    otpCode: process.env.NODE_ENV === 'development' ? otpCode : undefined // Expose OTP in dev mode for easy testing
   };
 };
 
 export const verifyOtp = async (email, otp, newPassword) => {
   const user = await User.findOne({ email });
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
-  }
+  if (!user) throw new Error("User not found");
 
   if (!user.otp || user.otp.code !== otp || user.otp.expiresAt < Date.now()) {
-    const error = new Error("Invalid or expired OTP");
-    error.statusCode = 400;
-    throw error;
+    throw new Error("Invalid or expired OTP");
   }
 
-  user.password = await bcrypt.hash(newPassword, 10);
+  if (newPassword) {
+    user.password = await bcrypt.hash(newPassword, 12);
+  }
+
   user.otp = undefined;
-  user.firstLogin = false;
-  user.verified = true;
+  user.is_EmailVerified = true;
+  user.verified = true; // backward compatibility
   await user.save();
 
-  return { message: "Password setup successful. You can now log in." };
+  const token = generateToken(user._id, user.tokenVersion || 0);
+  const refreshToken = generateRefreshToken(user._id);
+
+  return {
+    message: "Account verified successfully.",
+    token,
+    refreshToken,
+    user: {
+      id: user._id,
+      role: user.role,
+      name: user.name,
+      division: user.division,
+      is_Member: user.is_Member || user.memberships?.some(m => m.isMember),
+      memberships: user.memberships || [],
+      firstLogin: user.firstLogin
+    }
+  };
 };
 
-export const googleLogin = async (googleToken) => {
-  // Decode googleToken, extract email and name (mocked here)
-  // const decoded = await verifyGoogleToken(googleToken);
-  const email = "google@example.com"; 
+export const resendOtp = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found");
 
-  let user = await User.findOne({ email });
-  
-  if (!user) {
-    user = await User.create({
-      email,
-      password: crypto.randomBytes(16).toString("hex"), // Random secure default pass
-      role: "student", // default role
-      firstLogin: false,
-      verified: true,
-    });
+  if (user.is_EmailVerified) throw new Error("User is already verified");
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+  user.otp = { code: otpCode, expiresAt: Date.now() + 15 * 60 * 1000 };
+  await user.save();
+
+  try {
+    await EmailService.sendVerificationEmail(user.email, otpCode);
+  } catch (error) {
+    console.error('❌ Email Service Error:', error.message);
   }
+
+  return {
+    message: "OTP sent successfully. Please check your email.",
+    otpCode: process.env.NODE_ENV === 'development' ? otpCode : undefined // Expose OTP in dev mode
+  };
+};
+
+export const loginUser = async (email, password) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail })
+    .populate('division', 'name')
+    .populate('memberships.division', 'name');
+
+  if (!user) {
+    throw new Error("Invalid email or password");
+  }
+
+  // Check if password is a hash. Bcrypt hashes start with $2
+  const isHash = user.password.startsWith('$2');
+  const isMatch = isHash
+    ? await bcrypt.compare(password, user.password)
+    : password === user.password;
+
+  if (!isMatch) {
+    throw new Error("Invalid email or password");
+  }
+
+  if (!user.is_EmailVerified && user.role !== 'super-admin' && user.role !== 'super_admin' && user.role !== 'admin') {
+    throw new Error("Please verify your email address before logging in.");
+  }
+
+  const isGlobalMember = user.is_Member || user.memberships.some(m => m.isMember);
 
   const token = generateToken(user._id, user.tokenVersion || 0);
   const refreshToken = generateRefreshToken(user._id);
@@ -95,20 +146,101 @@ export const googleLogin = async (googleToken) => {
   return {
     token,
     refreshToken,
-    user: { id: user._id, role: user.role, division: user.division }
+    user: {
+      id: user._id,
+      role: user.role,
+      name: user.name,
+      division: user.division,
+      memberships: user.memberships || [],
+      is_Member: isGlobalMember,
+      firstLogin: user.firstLogin
+    }
   };
+};
+
+export const googleLogin = async (googleToken) => {
+  // Mocked for brevity
+  const email = "google@example.com";
+  let user = await User.findOne({ email });
+  if (!user) {
+    user = await User.create({
+      email,
+      password: crypto.randomBytes(16).toString("hex"),
+      role: "student",
+      is_EmailVerified: true,
+      verified: true,
+    });
+  }
+  const token = generateToken(user._id, user.tokenVersion || 0);
+  const refreshToken = generateRefreshToken(user._id);
+  return { token, refreshToken, user: { id: user._id, role: user.role, firstLogin: user.firstLogin } };
 };
 
 export const logoutUser = async (userId) => {
   const user = await User.findById(userId);
-  if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
+  if (user) {
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
   }
+  return { message: "Logged out successfully" };
+};
 
-  user.tokenVersion = (user.tokenVersion || 0) + 1;
+export const forgotPassword = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("No user found with this email address");
+
+  const resetOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.resetOTP = {
+    code: resetOtp,
+    expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
+  };
   await user.save();
 
-  return { message: "Logged out successfully" };
+  await EmailService.sendPasswordResetOTP(user.email, resetOtp);
+  return { success: true, message: "Password reset code sent to your email." };
+};
+
+export const resetPassword = async (email, otp, newPassword) => {
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found");
+
+  if (!user.resetOTP || user.resetOTP.code !== otp || user.resetOTP.expiresAt < Date.now()) {
+    throw new Error("Invalid or expired reset code");
+  }
+
+  // Hash new password
+  user.password = await bcrypt.hash(newPassword, 12);
+
+  // Clear reset OTP fields
+  user.resetOTP = undefined;
+
+  // Increment token version to invalidate all current sessions for security
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+
+  await user.save();
+
+  return { success: true, message: "Password has been reset successfully. You can now log in with your new password." };
+};
+
+export const changePassword = async (userId, oldPassword, newPassword) => {
+  const user = await User.findById(userId);
+  if (!user) throw new Error("User not found");
+
+  // Verify current password (handles both bcrypt hashes and legacy plain-text)
+  const isHash = user.password.startsWith('$2');
+  const isMatch = isHash
+    ? await bcrypt.compare(oldPassword, user.password)
+    : oldPassword === user.password;
+
+  if (!isMatch) {
+    throw new Error("Incorrect current password");
+  }
+
+  // Set new secure password
+  user.password = await bcrypt.hash(newPassword, 12);
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  user.firstLogin = false; // Mark as no longer first login
+  await user.save();
+
+  return { message: "Password changed successfully" };
 };

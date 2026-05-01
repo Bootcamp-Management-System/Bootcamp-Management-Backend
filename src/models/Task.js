@@ -11,6 +11,20 @@ const taskSchema = new mongoose.Schema(
       type: String,
       required: [true, "Task description is required"],
     },
+    projectLink: {
+      type: String,
+      trim: true,
+    },
+    maxScore: {
+      type: Number,
+      default: 100,
+      min: 1,
+    },
+    submissionTypes: {
+      type: [String],
+      enum: ["file", "github", "drive"],
+      default: ["file", "github"],
+    },
     startTime: {
       type: Date,
       required: [true, "Start time is required"],
@@ -24,6 +38,11 @@ const taskSchema = new mongoose.Schema(
       required: [true, "Deadline is required"],
     },
 
+    bootcamp: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Bootcamp",
+      required: [true, "Task must belong to a bootcamp"],
+    },
     division: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Division",
@@ -38,6 +57,10 @@ const taskSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    isMembershipTask: {
+      type: Boolean,
+      default: false
+    }
   },
   { timestamps: true },
 );

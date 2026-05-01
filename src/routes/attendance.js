@@ -1,14 +1,20 @@
 import express from "express";
-import { checkIn, getAttendance, markAttendance } from "../controllers/attendanceController.js";
+import { getAttendance, markAttendance, submitAttendance, generateAttendanceQR, scanQRCode } from "../controllers/attendanceController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
+import { bootcampGuard } from "../middlewares/bootcampGuard.js";
 
 const router = express.Router();
 
 router.use(protect);
+router.use(bootcampGuard); // 🔒 Only accepted students + staff
 
-router.post("/check-in", authorizeRole("super-admin", "admin", "instructor"), checkIn);
-router.post("/mark", authorizeRole("super-admin", "admin", "instructor"), markAttendance);
+// High-Trust QR Scan (Replaces insecure check-in)
+router.get("/qr-token/:sessionId", restrictTo("super-admin", "admin", "instructor"), generateAttendanceQR);
+router.post("/scan", restrictTo("student"), scanQRCode);
+
+router.post("/mark", restrictTo("super-admin", "admin", "instructor"), markAttendance);
+router.post("/submit", restrictTo("super-admin", "admin", "instructor"), submitAttendance);
 router.get("/", getAttendance);
 
 export default router;

@@ -1,26 +1,36 @@
 import express from "express";
-import { 
-  createDivision, 
-  getDivisions, 
-  updateDivision, 
-  deleteDivision, 
-  getUsersByDivision 
+import {
+  createDivision,
+  getDivisions,
+  updateDivision,
+  deleteDivision,
+  getUsersByDivision,
+  assignDivisionAdmin
 } from "../controllers/divisionController.js";
 import { authMiddleware as protect } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
 
 const router = express.Router();
+
+// Public Route for Landing Page
+router.get("/public", getDivisions);
 
 router.use(protect);
 
 router.route("/")
-  .post(authorizeRole("super-admin"), createDivision)
-  .get(authorizeRole("super-admin", "admin"), getDivisions);
+  .post(restrictTo("super-admin"), createDivision)
+  .get(restrictTo("super-admin", "admin"), getDivisions);
 
 router.route("/:id")
-  .patch(authorizeRole("super-admin"), updateDivision)
-  .delete(authorizeRole("super-admin"), deleteDivision);
+  .patch(restrictTo("super-admin"), updateDivision)
+  .delete(restrictTo("super-admin"), deleteDivision);
 
-router.get("/:divisionId/users", authorizeRole("super-admin", "admin"), getUsersByDivision);
+router.get("/:divisionId/users", restrictTo("super-admin", "admin"), getUsersByDivision);
+
+router.post(
+  "/:divisionId/assign-admin",
+  restrictTo("super-admin"),
+  assignDivisionAdmin
+);
 
 export default router;

@@ -4,12 +4,16 @@ import {
   getMe,
   getUsers,
   promoteUser,
+  demoteUser,
   getUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  importMembers,
+  getMemberPool,
+  completeOnboarding
 } from "../controllers/userController.js";
 import { authMiddleware } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
 
 const router = express.Router();
 
@@ -29,13 +33,14 @@ router.post("/setup", async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await User.create({
+    name: "Super Admin",
     email,
     password: hashedPassword,
     role: "super-admin",
     firstLogin: false,
     verified: true
   });
-  
+
   res.status(201).json({ success: true, message: "Super Admin created. You can now login.", data: { id: user._id, email, role: user.role }});
 });
 
@@ -43,19 +48,25 @@ router.post("/setup", async (req, res) => {
 router.use(authMiddleware);
 
 // POST /users/promote
-router.post("/promote", authorizeRole("super-admin", "admin"), promoteUser);
+router.post("/promote", restrictTo("super-admin", "admin"), promoteUser);
 // PATCH /users/:id/promote
-router.patch("/:id/promote", authorizeRole("super-admin", "admin"), promoteUser);
+router.patch("/:id/promote", restrictTo("super-admin", "admin"), promoteUser);
+// PATCH /users/:id/demote
+router.patch("/:id/demote", restrictTo("super-admin", "super_admin"), demoteUser);
+
+router.post("/import-members", restrictTo("super-admin"), importMembers);
+router.get("/pool", restrictTo("super-admin", "admin"), getMemberPool);
 
 router
   .route("/")
-  .post(authorizeRole("super-admin", "admin"), createUser)
-  .get(authorizeRole("super-admin", "admin"), getUsers);
+  .post(restrictTo("super-admin", "admin"), createUser)
+  .get(restrictTo("super-admin", "admin"), getUsers);
 
 router.get("/me", getMe);
+router.post("/onboarding", completeOnboarding);
 
 router.get("/:id", getUser);
-router.put("/:id", authorizeRole("super-admin", "admin"), updateUser);
-router.delete("/:id", authorizeRole("super-admin"), deleteUser);
+router.put("/:id", restrictTo("super-admin", "admin"), updateUser);
+router.delete("/:id", restrictTo("super-admin"), deleteUser);
 
 export default router;

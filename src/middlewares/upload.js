@@ -23,16 +23,23 @@ const fileFilter = (req, file, cb) => {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
     'application/vnd.openxmlformats-officedocument.presentationml.presentation', // pptx
     'application/zip', // zip
-    'application/x-zip-compressed'
+    'application/x-zip-compressed',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime'
   ];
 
-  const allowedExts = ['.pdf', '.docx', '.pptx', '.zip'];
+  const allowedExts = ['.pdf', '.docx', '.pptx', '.zip', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.mov'];
   const ext = path.extname(file.originalname).toLowerCase();
 
   if (allowedTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF, DOCX, PPTX, and ZIP files are allowed.'), false);
+    cb(new Error('Invalid file type. Only PDF, video, image, ZIP, DOCX, and PPTX files are allowed.'), false);
   }
 };
 

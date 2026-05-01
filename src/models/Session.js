@@ -10,10 +10,15 @@ const sessionSchema = new mongoose.Schema(
     description: {
       type: String,
     },
+    bootcamp: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Bootcamp",
+      required: [true, "Bootcamp is required"],
+    },
     division: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Division",
-      required: [true, "Division ID is required"],
+      required: [true, "Division is required"],
     },
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -34,11 +39,19 @@ const sessionSchema = new mongoose.Schema(
       type: Date,
       required: [true, "End time is required"],
     },
+    status: {
+      type: String,
+      enum: ["scheduled", "ready", "completed"],
+      default: "scheduled",
+    },
+    completedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
 sessionSchema.index({ instructor: 1, startTime: 1, endTime: 1 });
-sessionSchema.index({ division: 1, startTime: 1, endTime: 1 });
+sessionSchema.index({ bootcamp: 1, startTime: 1, endTime: 1 });
 
 export default mongoose.model("Session", sessionSchema);

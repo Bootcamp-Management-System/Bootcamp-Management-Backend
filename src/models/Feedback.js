@@ -20,7 +20,6 @@ const feedbackSchema = new mongoose.Schema(
     },
     comment: {
       type: String,
-      required: [true, "Feedback comment is required"],
       trim: true,
     },
     division: {
@@ -28,8 +27,12 @@ const feedbackSchema = new mongoose.Schema(
       ref: "Division",
       required: true,
     },
+    showOnLandingPage: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Prevent a student from rating the same session twice

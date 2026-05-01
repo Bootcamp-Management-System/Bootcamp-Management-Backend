@@ -10,17 +10,31 @@ const resourceSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  resource_type: {
+    type: String,
+    enum: ['file', 'link'],
+    default: 'file',
+  },
   file_url: {
     type: String,
-    required: true,
+  },
+  external_url: {
+    type: String,
+    trim: true,
   },
   file_type: {
     type: String,
+    enum: ['pdf', 'video', 'image', 'zip', 'docx', 'pptx', 'link'],
+  },
+  bootcamp_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Bootcamp',
+    default: null
   },
   division_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Division',
-    required: [true, 'Division ID is required'],
+    default: null
   },
   session_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -37,9 +51,23 @@ const resourceSchema = new mongoose.Schema({
   },
   visibility: {
     type: String,
-    enum: ['public', 'division'],
-    default: 'division'
+    enum: ['public', 'bootcamp'],
+    default: 'bootcamp'
+  },
+  download_count: {
+    type: Number,
+    default: 0,
   }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+
+resourceSchema.pre('validate', function validateResourceTarget() {
+  if (this.resource_type === 'link' && !this.external_url) {
+    this.invalidate('external_url', 'External URL is required for link resources');
+  }
+
+  if (this.resource_type === 'file' && !this.file_url) {
+    this.invalidate('file_url', 'File URL is required for uploaded resources');
+  }
+});
 
 export default mongoose.model('Resource', resourceSchema);

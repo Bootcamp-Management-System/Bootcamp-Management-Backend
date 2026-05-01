@@ -1,621 +1,165 @@
 # Bootcamp Management API Reference
 
-This file documents the current API surface based on the live routes in `src/routes/` and controllers in `src/controllers/`.
-
 Base URL: `http://localhost:5000/api/v1`
 
-Common response shape:
-- Success responses usually return `{ success: true, ... }`
-- Errors usually return `{ message: "..." }` or `{ error: "...", message: "..." }`
+---
 
-## Authentication
+## 🔑 1. Authentication
+### POST `/auth/signup`
+- **Body:**
+  ```json
+  {
+    "email": "student@example.com",
+    "password": "Password123!",
+    "name": "Jane Doe"
+  }
+  ```
 
 ### POST `/auth/login`
-- Access: Public
-- Body (`req.body`):
+- **Body:**
   ```json
   {
     "email": "user@example.com",
-    "password": "password123"
+    "password": "Password123!"
   }
   ```
-- Response:
-  - `200 OK` with `{ success: true, token, refreshToken, user }`
-  - Or `200 OK` with `{ message: "..." }` when OTP verification is required
+- **Response:** `{ "token": "...", "refreshToken": "...", "user": { "role": "student", "isMember": false } }`
 
-### POST `/auth/verify-otp`
-- Access: Public
-- Body (`req.body`):
+### POST `/auth/forgot-password`
+- **Body:** `{ "email": "user@example.com" }`
+
+### POST `/auth/reset-password`
+- **Body:**
   ```json
   {
     "email": "user@example.com",
     "otp": "123456",
-    "newPassword": "newSecurePassword123"
+    "newPassword": "NewSecurePassword!"
   }
   ```
-- Response: `200 OK` with the verification result payload from the auth service
 
-### POST `/auth/google-login`
-- Access: Public
-- Body (`req.body`):
+---
+
+## 🚀 2. Recruitment & Enrollment
+### POST `/recruitment/apply`
+- **Body:**
   ```json
   {
-    "googleToken": "google-oauth-token"
+    "bootcampId": "ID_HERE",
+    "phase1Answers": {
+      "why_join": "I love coding",
+      "experience": "Beginner"
+    }
   }
   ```
-- Response: `200 OK` with `{ success: true, token, refreshToken, user }`
 
-### POST `/auth/logout`
-- Access: Authenticated
-- Headers: `Authorization: Bearer <token>`
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "Logged out successfully" }`
-
-## Users
-
-### POST `/users/setup`
-- Access: Public, one-time only when no users exist
-- Body (`req.body`):
+### PATCH `/recruitment/decide/:applicationId`
+- **Body:**
   ```json
   {
-    "email": "super@admin.com",
-    "password": "password123"
+    "decision": "ACCEPT",
+    "note": "Great technical skills shown."
   }
   ```
-- Response: `201 Created` with `{ success: true, message, data: { id, email, role } }`
+  *(Decisions: `PASS`, `WAIT`, `REJECT`, `ACCEPT`)*
 
-### POST `/users`
-- Access: Authenticated, `super-admin` or `admin`
-- Body (`req.body`):
-  ```json
-  {
-    "email": "new@student.com",
-    "password": "password123",
-    "role": "student"
-  }
-  ```
-- Notes:
-  - `password` is optional and can be generated automatically
-  - When an admin creates a user, the new user automatically inherits the admin's own division
-  - A `division` value is only needed when a super-admin is creating an admin account
-- Response: `201 Created` with `{ success: true, message, data, tempPassword }`
+### POST `/enrollments/activate`
+- **Body:** `{ "otp": "123456" }`
+- **Description:** Uses the code from the Acceptance Email to activate classroom access.
 
-### GET `/users`
-- Access: Authenticated, `super-admin` or `admin`
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: users[] }`
+---
 
-### GET `/users/me`
-- Access: Authenticated
-- Body: none
-- Response: `200 OK` with `{ success: true, data: user }`
-
-### GET `/users/:id`
-- Access: Authenticated
-- Params (`req.params`):
-  ```json
-  {
-    "id": "user_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, data: user }`
-
-### PUT `/users/:id`
-- Access: Authenticated, `super-admin` or `admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "user_id"
-  }
-  ```
-- Body (`req.body`):
-  ```json
-  {
-    "email": "updated@example.com",
-    "role": "student",
-    "division": "division_id"
-  }
-  ```
-- Response: `200 OK` with `{ success: true, message, data: user }`
-
-### DELETE `/users/:id`
-- Access: Authenticated, `super-admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "user_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "User deleted successfully" }`
-
-### POST `/users/promote`
-- Access: Authenticated, `super-admin` or `admin`
-- Body (`req.body`):
-  ```json
-  {
-    "newRole": "instructor",
-    "divisionId": "division_id",
-    "reason": "Promoted for teaching"
-  }
-  ```
-- Response: `200 OK` with `{ success: true, message, userId, newRole, tempPassword }`
-
-### PATCH `/users/:id/promote`
-- Access: Authenticated, `super-admin` or `admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "user_id"
-  }
-  ```
-- Body (`req.body`): same as `POST /users/promote`
-- Response: same as `POST /users/promote`
-
-## Divisions
-
-### POST `/divisions`
-- Access: Authenticated, `super-admin`
-- Body (`req.body`):
-  ```json
-  {
-    "name": "Software Engineering",
-    "description": "Fullstack Web & Mobile Development"
-  }
-  ```
-- Response: `201 Created` with `{ success: true, data: division }`
-
-### GET `/divisions`
-- Access: Authenticated, `super-admin` or `admin`
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: divisions[] }`
-
-### PATCH `/divisions/:id`
-- Access: Authenticated, `super-admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "division_id"
-  }
-  ```
-- Body (`req.body`):
-  ```json
-  {
-    "name": "Updated Division Name",
-    "description": "Updated description"
-  }
-  ```
-- Response: `200 OK` with `{ success: true, message, data: division }`
-
-### DELETE `/divisions/:id`
-- Access: Authenticated, `super-admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "division_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "Division deleted successfully" }`
-
-### GET `/divisions/:divisionId/users`
-- Access: Authenticated, `super-admin` or `admin`
-- Params (`req.params`):
-  ```json
-  {
-    "divisionId": "division_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: users[] }`
-
-## Sessions
-
+## 📅 3. Sessions & Attendance
 ### POST `/sessions`
-- Access: Authenticated, `super-admin` or `admin`
-- Body (`req.body`):
+- **Body:**
   ```json
   {
-    "title": "React Context API",
-    "description": "Deep dive into useContext",
-    "division": "division_id",
-    "location": "Zoom link or room",
-    "meetingLink": "https://meet.example.com/abc",
-    "startTime": "2026-04-20T10:00:00.000Z",
-    "endTime": "2026-04-20T12:00:00.000Z"
+    "title": "React Hooks Deep Dive",
+    "bootcamp": "BOOTCAMP_ID",
+    "instructor": "USER_ID",
+    "startTime": "2026-05-01T10:00:00Z",
+    "endTime": "2026-05-01T12:00:00Z",
+    "meetingLink": "https://zoom.us/j/..."
   }
   ```
-- Notes: 
-  - `instructor` ID is no longer required at creation. Admins can assign later.
-- Response: `201 Created` with `{ success: true, data: session }`
 
-### PATCH `/sessions/:id/assign-instructor`
-- Access: Authenticated, `super-admin` or `admin`
-- Params (`req.params`):
+### GET `/attendance/qr-token/:sessionId`
+- **Response:** `{ "token": "EYJ..." }` (20-second validity)
+
+### POST `/attendance/scan`
+- **Body:** `{ "token": "TOKEN_FROM_QR" }`
+
+### PATCH `/attendance/manual-override`
+- **Body:**
   ```json
   {
-    "id": "session_id"
+    "studentId": "ID",
+    "sessionId": "ID",
+    "status": "PRESENT",
+    "note": "Medical excuse"
   }
   ```
-- Body (`req.body`):
-  ```json
-  {
-    "instructorId": "user_id_of_instructor"
-  }
-  ```
-- Response: `200 OK` with `{ success: true, data: session }`
 
-### GET `/sessions`
-- Access: Authenticated
-- Query (`req.query`): optional filters depending on middleware/service behavior
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: sessions[] }`
+---
 
-### PUT `/sessions/:id`
-- Access: Authenticated, `super-admin` or `admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "session_id"
-  }
-  ```
-- Body (`req.body`): any session fields supported by the service
-- Response: `200 OK` with `{ success: true, data: session }`
-
-### DELETE `/sessions/:id`
-- Access: Authenticated, `super-admin` or `admin`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "session_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "Session deleted successfully" }`
-
-### GET `/sessions/:session_id/resources`
-- Access: Authenticated
-- Params (`req.params`):
-  ```json
-  {
-    "session_id": "session_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: resources[] }`
-
-## Attendance
-
-### POST `/attendance/check-in`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Body (`req.body`):
-  ```json
-  {
-    "session": "session_id",
-    "studentId": "student_id",
-    "note": "Optional note"
-  }
-  ```
-- Notes:
-  - Used by instructors or admins to check a student in. 
-  - If the check-in time is **> 10 minutes** after the session's `startTime`, the student is automatically marked as `"Late"`. Otherwise, `"Present"`.
-- Response: `201 Created` with `{ success: true, data: attendance }`
-
-### POST `/attendance/mark`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Body (`req.body`):
-  ```json
-  {
-    "studentId": "student_user_id",
-    "sessionId": "session_id",
-    "status": "Present",
-    "note": "Optional note"
-  }
-  ```
-- Notes:
-  - Valid values for `status`: `"Present"`, `"Late"`, `"Absent"`, `"Excused"`.
-  - Edits/Manual marking can **only occur within 24 hours** of the session's `endTime`. Attempts to modify attendance after this window will return a `400 Bad Request`.
-- Response: `200 OK` with `{ success: true, data: attendance }`
-
-### GET `/attendance`
-- Access: Authenticated
-- Query (`req.query`):
-  ```json
-  {
-    "sessionId": "session_id"
-  }
-  ```
-- Notes:
-  - For students, it returns only their own attendance records.
-  - For instructors, it returns attendance records for their sessions.
-  - For admins, it returns attendance records across their division.
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: attendance[] }`
-
-## Tasks
-
+## 📂 4. Tasks, Submissions & Feedback
 ### POST `/tasks`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Body (`req.body`):
+- **Body:**
   ```json
   {
-    "title": "Build a REST API",
-    "description": "Create CRUD endpoints",
-    "startTime": "2026-04-20T10:00:00.000Z",
-    "endTime": "2026-04-25T23:59:59.000Z",
-    "deadline": "2026-04-25T23:59:59.000Z",
-    "division": "division_id",
-    "session": "session_id"
+    "title": "Build a Portfolio",
+    "description": "Use HTML/CSS",
+    "session": "SESSION_ID",
+    "dueDate": "2026-05-10"
   }
   ```
-- Response: `201 Created` with `{ success: true, data: task }`
 
-### GET `/tasks`
-- Access: Authenticated
-- Query (`req.query`): service-supported filters
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: tasks[] }`
-
-### GET `/tasks/:id`
-- Access: Authenticated
-- Params (`req.params`):
+### POST `/submissions`
+- **Body:**
   ```json
   {
-    "id": "task_id"
+    "task": "TASK_ID",
+    "content": "https://github.com/user/portfolio",
+    "note": "Added some animations"
   }
   ```
-- Body: none
-- Response: `200 OK` with `{ success: true, data: task }`
-
-### PUT `/tasks/:id`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "task_id"
-  }
-  ```
-- Body (`req.body`): task fields supported by the service
-- Response: `200 OK` with `{ success: true, data: task }`
-
-### DELETE `/tasks/:id`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "task_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "Task removed" }`
-
-## Submissions
-
-### POST `/submissions/submit`
-- Access: Authenticated, `student`
-- Body (`req.body`):
-  ```json
-  {
-    "taskId": "task_id",
-    "contentUrl": "https://github.com/my-student-repo",
-    "repository_url": "https://github.com/my-student-repo",
-    "comment": "Optional note"
-  }
-  ```
-- Notes:
-  - `contentUrl` is the primary field
-  - `repository_url` is also accepted and mapped internally
-- Response: `201 Created` with `{ success: true, data: submission }`
-
-### POST `/submissions/:taskId`
-- Access: Authenticated, `student`
-- Params (`req.params`):
-  ```json
-  {
-    "taskId": "task_id"
-  }
-  ```
-- Body (`req.body`): same as `/submissions/submit` except `taskId` comes from the URL
-- Response: `201 Created` with `{ success: true, data: submission }`
-
-### PUT `/submissions/:id`
-- Access: Authenticated, `student`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "submission_id"
-  }
-  ```
-- Body (`req.body`):
-  ```json
-  {
-    "contentUrl": "https://github.com/updated-repo",
-    "comment": "Updated comment"
-  }
-  ```
-- Response: `200 OK` with `{ success: true, data: submission }`
-
-### PATCH `/submissions/review/:id`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Params (`req.params`):
-  ```json
-  {
-    "id": "submission_id"
-  }
-  ```
-- Body (`req.body`):
-  ```json
-  {
-    "status": "approved",
-    "feedback": "Good work",
-    "grade": 95
-  }
-  ```
-- Response: `200 OK` with `{ success: true, data: submission }`
-
-### GET `/submissions`
-- Access: Authenticated
-- Query (`req.query`):
-  ```json
-  {
-    "taskId": "task_id",
-    "studentId": "student_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: submissions[] }`
-
-## Feedback
 
 ### POST `/feedback`
-- Access: Authenticated, `student`
-- Body (`req.body`):
+- **Body:**
   ```json
   {
-    "sessionId": "session_id",
+    "sessionId": "ID",
     "rating": 5,
-    "comment": "Great session"
+    "comment": "Amazing session, very clear!"
   }
   ```
-- Response: `201 Created` with `{ success: true, data: feedback }`
 
-### GET `/feedback`
-- Access: Authenticated
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: feedback[] }`
+---
 
-### PUT `/feedback/:id`
-- Access: Authenticated, `student`
-- Params (`req.params`):
+## 🏠 5. Landing Page (Public)
+### GET `/bootcamps/public`
+### GET `/divisions/public`
+### GET `/feedback/public`
+- **Response:** List of curated testimonials where `showOnLandingPage: true`.
+
+### GET `/success-stories/public`
+- **Response:**
   ```json
-  {
-    "id": "feedback_id"
-  }
+  [
+    {
+      "studentName": "Alex",
+      "story": "Started with zero knowledge...",
+      "achievement": "Dev at Microsoft",
+      "bootcamp": { "name": "Fullstack Bootcamp" }
+    }
+  ]
   ```
-- Body (`req.body`):
-  ```json
-  {
-    "rating": 4,
-    "comment": "Updated comment"
-  }
-  ```
-- Response: `200 OK` with `{ success: true, data: feedback }`
 
-### GET `/feedback/stats/:sessionId`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Params (`req.params`):
-  ```json
-  {
-    "sessionId": "session_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, data: { averageRating, totalFeedbacks } }`
+---
 
-## Notifications
-
-### POST `/notifications`
-- Access: Authenticated, `super-admin` or `admin`
-- Body (`req.body`): Send a notification to either one user (`recipientId`) or perfectly broadcast it to an entire division (`divisionId`).
-  ```json
-  {
-    "title": "New Bootcamp Material uploaded!",
-    "message": "Welcome. Check resources module.",
-    "type": "info",
-    "recipientId": "student_user_id" 
-    // OR "divisionId": "division_id"
-  }
-  ```
-- Response: `201 Created` with `{ success: true, count, message: "Notifications dispatched" }`
-
+## 🔔 6. Notifications
 ### GET `/notifications`
-- Access: Authenticated
-- Body: none
-- Response: `200 OK` with `{ success: true, count, data: notifications[] }`
-
-### GET `/notifications/unread-count`
-- Access: Authenticated
-- Body: none
-- Response: `200 OK` with `{ success: true, unreadCount }`
+- **Response:** `{ "data": [ { "title": "New Assignment", "message": "...", "isRead": false } ] }`
 
 ### PATCH `/notifications/:id/read`
-- Access: Authenticated
-- Params (`req.params`): `id` (the notification ID)
-- Body: none
-- Response: `200 OK` with `{ success: true, data: notification_marked_read }`
-
-### PATCH `/notifications/read-all`
-- Access: Authenticated
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "All notifications marked as read" }`
-
-## Resources
-
-### POST `/resources/upload`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Content type: `multipart/form-data`
-- Body (`form-data`):
-  - `file` (File)
-  - `title` (Text)
-  - `description` (Text, optional)
-  - `division_id` (Text)
-  - `session_id` (Text, optional)
-  - `visibility` (Text, optional; default is `division`)
-- Response: `201 Created` with:
-  ```json
-  {
-    "message": "Resource uploaded successfully",
-    "resource_id": "resource_id",
-    "file_url": "/uploads/resources/filename.ext"
-  }
-  ```
-
-### GET `/resources`
-- Access: Authenticated
-- Body: none
-- Response: `200 OK` with `{ success: true, count, groups, data: groupedResources[] }`
-
-### GET `/resources/division/:division_id`
-- Access: Authenticated
-- Params (`req.params`):
-  ```json
-  {
-    "division_id": "division_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, count, groups, data: groupedResources[] }`
-
-### GET `/resources/:resource_id`
-- Access: Authenticated
-- Params (`req.params`):
-  ```json
-  {
-    "resource_id": "resource_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, data: resource }`
-
-### GET `/resources/:resource_id/download`
-- Access: Authenticated
-- Params (`req.params`):
-  ```json
-  {
-    "resource_id": "resource_id"
-  }
-  ```
-- Body: none
-- Response: File download stream
-
-### DELETE `/resources/:resource_id`
-- Access: Authenticated, `super-admin`, `admin`, or `instructor`
-- Params (`req.params`):
-  ```json
-  {
-    "resource_id": "resource_id"
-  }
-  ```
-- Body: none
-- Response: `200 OK` with `{ success: true, message: "Resource deleted successfully" }`
+- **Description:** Mark an alert as read.

@@ -1,5 +1,60 @@
+import mongoose from "mongoose";
 import Submission from "../models/Submission.js";
 import Task from "../models/Task.js";
+import Enrollment from "../models/Enrollment.js";
+
+const getUserId = (user) => user?._id || user?.id;
+
+const gradeScores = {
+  A: 100,
+  B: 85,
+  C: 70,
+  D: 55,
+};
+
+const getSubmissionPayload = (req) => {
+  const {
+    title,
+    submissionTitle,
+    description,
+    submissionDescription,
+    contentUrl,
+    projectUrl,
+    githubUrl,
+    github_url,
+    repository_url,
+    repositoryUrl,
+    repoUrl,
+    driveUrl,
+    drive_url,
+    googleDriveUrl,
+    comment,
+  } = req.body;
+
+  const fileUrl = req.file ? `/uploads/submissions/${req.file.filename}` : undefined;
+  const fileName = req.file?.originalname;
+  const nextGithubUrl = githubUrl || github_url || repository_url || repositoryUrl || repoUrl;
+  const nextDriveUrl = driveUrl || drive_url || googleDriveUrl;
+  const nextContentUrl = contentUrl || projectUrl;
+
+  return {
+    title: title || submissionTitle,
+    description: description || submissionDescription,
+    contentUrl: nextContentUrl,
+    githubUrl: nextGithubUrl,
+    driveUrl: nextDriveUrl,
+    fileUrl,
+    fileName,
+    comment,
+    submissionType: [
+      fileUrl ? "file" : null,
+      nextGithubUrl ? "github" : null,
+      nextDriveUrl ? "drive" : null,
+    ].filter(Boolean).length > 1
+      ? "mixed"
+      : (fileUrl ? "file" : nextGithubUrl ? "github" : nextDriveUrl ? "drive" : "mixed"),
+  };
+};
 
 const getUserDivisionId = (user) => {
   if (user?.division) return user.division;
@@ -29,51 +84,67 @@ const userHasDivisionAccess = (user, divisionId) => {
 export const submitTask = async (req, res) => {
   try {
     const taskId = req.params.taskId || req.body.taskId;
-    const { contentUrl, comment, repository_url, repositoryUrl, repoUrl, link, url } = req.body;
-    const studentId = req.user.id;
-    const submissionUrl = contentUrl || repository_url || repositoryUrl || repoUrl || link || url;
+    const studentId = getUserId(req.user);
+    const payload = getSubmissionPayload(req);
 
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ error: "Task not found" });
 
-    if (!submissionUrl) {
-      return res.status(400).json({ error: "Submission content (URL/Link) is required" });
+    if (!payload.contentUrl && !payload.githubUrl && !payload.driveUrl && !payload.fileUrl) {
+      return res.status(400).json({ error: "Submit a file, GitHub link, Google Drive link, or project link" });
     }
 
-    // Verify student is in the task's division
-    const taskDivisionId = task.division;
+    const enrollment = await Enrollment.findOne({
+      student: studentId,
+      bootcamp: task.bootcamp,
+      is_active: true,
+    });
 
-    if (!userHasDivisionAccess(req.user, taskDivisionId)) {
-      return res.status(403).json({ error: "You are not assigned to a division" });
+    if (!enrollment) {
+      return res.status(403).json({ error: "You can only submit tasks for bootcamps you are enrolled in" });
     }
 
-    if (!req.user.division) {
-      req.user.division = taskDivisionId;
-      await req.user.save();
-    }
+    let submission = await Submission.findOne({ task: taskId, student: studentId });
+    const isReturnedForResubmission = ["returned", "resubmission_required"].includes(submission?.status);
 
-    const studentDivisionId = getUserDivisionId(req.user);
-    if (studentDivisionId && studentDivisionId.toString() !== taskDivisionId.toString()) {
-      return res.status(403).json({ error: "You cannot submit tasks for a different division" });
-    }
-
-    // Check deadline
-    if (new Date() > new Date(task.deadline)) {
+    // Check deadline. Returned work can be resubmitted for version tracking.
+    if (!isReturnedForResubmission && new Date() > new Date(task.deadline)) {
        return res.status(400).json({ error: "Deadline has passed" });
     }
 
-    const submission = await Submission.create({
+    if (submission) {
+      submission.versions.push({
+        contentUrl: submission.contentUrl,
+        title: submission.title,
+        description: submission.description,
+        githubUrl: submission.githubUrl,
+        driveUrl: submission.driveUrl,
+        fileUrl: submission.fileUrl,
+        fileName: submission.fileName,
+        comment: submission.comment,
+        submittedAt: submission.updatedAt || submission.createdAt || new Date(),
+      });
+      submission.version += 1;
+      Object.assign(submission, payload, {
+        status: "pending",
+        feedback: undefined,
+        grade: undefined,
+        gradeLetter: undefined,
+        reviewedBy: undefined,
+        reviewedAt: undefined,
+      });
+      await submission.save();
+      return res.status(200).json({ success: true, data: submission });
+    }
+
+    submission = await Submission.create({
       task: taskId,
       student: studentId,
-      contentUrl: submissionUrl,
-      comment
+      ...payload,
     });
 
     res.status(201).json({ success: true, data: submission });
   } catch (error) {
-    if (error.code === 11000) {
-       return res.status(400).json({ error: "You have already submitted this task" });
-    }
     res.status(500).json({ error: "Server Error", message: error.message });
   }
 };
@@ -81,28 +152,47 @@ export const submitTask = async (req, res) => {
 // @desc    Update a submission (Student only)
 export const updateSubmission = async (req, res) => {
   try {
-    const { contentUrl, comment } = req.body;
+    const payload = getSubmissionPayload(req);
     const submission = await Submission.findById(req.params.id).populate("task");
 
     if (!submission) return res.status(404).json({ error: "Submission not found" });
 
     // Verify it's the student's own submission
-    if (submission.student.toString() !== req.user.id.toString()) {
+    if (submission.student.toString() !== getUserId(req.user).toString()) {
        return res.status(403).json({ error: "You can only edit your own submissions" });
     }
 
-    // Only allow editing if it hasn't been reviewed yet
-    if (submission.status !== 'pending') {
-       return res.status(400).json({ error: "Submission has already been reviewed and cannot be edited" });
+    if (submission.status === "graded") {
+       return res.status(400).json({ error: "Graded submissions cannot be edited" });
     }
 
-    // Check deadline
-    if (new Date() > new Date(submission.task.deadline)) {
+    const isReturnedForResubmission = ["returned", "resubmission_required"].includes(submission.status);
+
+    // Check deadline. Returned work can be resubmitted for version tracking.
+    if (!isReturnedForResubmission && new Date() > new Date(submission.task.deadline)) {
        return res.status(400).json({ error: "Deadline has passed, you can no longer edit your submission" });
     }
 
-    submission.contentUrl = contentUrl || submission.contentUrl;
-    submission.comment = comment || submission.comment;
+    submission.versions.push({
+      contentUrl: submission.contentUrl,
+      title: submission.title,
+      description: submission.description,
+      githubUrl: submission.githubUrl,
+      driveUrl: submission.driveUrl,
+      fileUrl: submission.fileUrl,
+      fileName: submission.fileName,
+      comment: submission.comment,
+      submittedAt: submission.updatedAt || submission.createdAt || new Date(),
+    });
+    submission.version += 1;
+    Object.assign(submission, payload, {
+      status: "pending",
+      feedback: undefined,
+      grade: undefined,
+      gradeLetter: undefined,
+      reviewedBy: undefined,
+      reviewedAt: undefined,
+    });
     await submission.save();
 
     res.status(200).json({ success: true, data: submission });
@@ -114,22 +204,48 @@ export const updateSubmission = async (req, res) => {
 // @desc    Review a submission (Instructor/Admin only)
 export const reviewSubmission = async (req, res) => {
   try {
-    const { status, feedback, grade } = req.body;
-    const reviewerId = req.user.id;
+    const { status, feedback, grade, gradeLetter } = req.body;
+    const reviewerId = getUserId(req.user);
 
     const submission = await Submission.findById(req.params.id).populate("task");
     if (!submission) return res.status(404).json({ error: "Submission not found" });
 
-    // RBAC check: Reviewer must be in the same division
-     const reviewerDivisionId = getUserDivisionId(req.user);
-     if (req.user.role === 'admin' && !userHasDivisionAccess(req.user, submission.task.division)) {
-       return res.status(403).json({ error: "You can only review submissions in your division" });
-    }
-    // Instructors might have more granular checks (if assigned) - for now keep it simple
+    // Contextual Permission Check
+    const task = submission.task;
+    const isGlobalAdmin = ['super-admin', 'admin'].includes(req.user.role);
+    let isSessionInstructor = false;
 
-    submission.status = status;
+    if (task.session) {
+       // Need to fetch session to check instructor
+       const Session = mongoose.model('Session');
+       const session = await Session.findById(task.session);
+       isSessionInstructor = session?.instructor?.toString() === getUserId(req.user).toString();
+    }
+
+    if (!isGlobalAdmin && !isSessionInstructor) {
+       return res.status(403).json({ error: "You do not have permission to review this submission. Only the assigned instructor or division admin can do this." });
+    }
+
+    // Admin Division Check
+    if (req.user.role === 'admin' && !userHasDivisionAccess(req.user, task.division)) {
+       return res.status(403).json({ error: "Admins can only review submissions in their own division" });
+    }
+
+    const normalizedStatus = status === "reviewed" ? "graded" : status === "resubmission_required" ? "returned" : status;
+    if (!["graded", "returned"].includes(normalizedStatus)) {
+      return res.status(400).json({ error: "Status must be Graded or Returned" });
+    }
+
+    if (normalizedStatus === "graded" && gradeLetter && !gradeScores[gradeLetter]) {
+      return res.status(400).json({ error: "Grade must be A, B, C, or D" });
+    }
+
+    submission.status = normalizedStatus;
     submission.feedback = feedback;
-    submission.grade = grade;
+    submission.gradeLetter = normalizedStatus === "graded" ? gradeLetter : undefined;
+    submission.grade = normalizedStatus === "graded"
+      ? (gradeLetter ? gradeScores[gradeLetter] : grade)
+      : undefined;
     submission.reviewedBy = reviewerId;
     submission.reviewedAt = new Date();
 
@@ -144,15 +260,19 @@ export const reviewSubmission = async (req, res) => {
 // @desc    Get submissions (Filtered)
 export const getSubmissions = async (req, res) => {
   try {
-    const { taskId, studentId } = req.query;
+    const { taskId, studentId, sessionId } = req.query;
     const filter = {};
 
     if (taskId) filter.task = taskId;
     if (studentId) filter.student = studentId;
+    if (sessionId) {
+      const sessionTasks = await Task.find({ session: sessionId }).select("_id");
+      filter.task = { $in: sessionTasks.map((task) => task._id) };
+    }
 
     // RBAC logic for viewing
     if (req.user.role === 'student') {
-       filter.student = req.user.id;
+       filter.student = getUserId(req.user);
     } else if (req.user.role === 'instructor' || req.user.role === 'admin') {
        // Controller handles basic filter, but we might want to ensure they see right division
        // For now, if taskId is provided, verify they have access to that task
@@ -165,8 +285,8 @@ export const getSubmissions = async (req, res) => {
     }
 
     const submissions = await Submission.find(filter)
-      .populate("student", "email")
-      .populate("task", "title")
+      .populate("student", "name email")
+      .populate("task", "title maxScore session")
       .populate("reviewedBy", "email");
 
     res.status(200).json({ success: true, count: submissions.length, data: submissions });

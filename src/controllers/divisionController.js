@@ -64,3 +64,31 @@ export const getUsersByDivision = async (req, res) => {
     res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
   }
 };
+
+/**
+ * @desc    Assign an existing member as Division Admin
+ * @route   POST /api/v1/divisions/:divisionId/assign-admin
+ * @access  Private/SuperAdmin
+ */
+export const assignDivisionAdmin = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
+    const result = await divisionService.assignDivisionAdmin({
+      divisionId: req.params.divisionId,
+      userId,
+      requester: req.user,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Division admin assigned successfully",
+      data: result,
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: "Server Error", message: error.message });
+  }
+};

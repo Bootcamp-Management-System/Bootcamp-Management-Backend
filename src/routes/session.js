@@ -1,34 +1,27 @@
 import express from "express";
-import {
-  createSession,
-  getSessions,
-  updateSession,
-  deleteSession,
-  assignInstructor
-} from "../controllers/sessionController.js";
-import { getResourcesBySession } from "../controllers/resourceController.js";
-import { authMiddleware } from "../middlewares/auth.js";
-import { authorizeRole } from "../middlewares/roleBase/roleMiddleware.js";
-import { checkDivisionAccess } from "../middlewares/roleBase/divisionMiddleware.js";
+import { createSession, getSessions, getSessionById, updateSession, deleteSession, assignInstructor, getAvailableInstructors } from "../controllers/sessionController.js";
+import { authMiddleware as protect } from "../middlewares/auth.js";
+import { restrictTo } from "../middlewares/roleValidator.js";
+import { checkDivisionAccess } from "../middlewares/divisionGuard.js";
+import { bootcampGuard } from "../middlewares/bootcampGuard.js";
 
 const router = express.Router();
 
-router.use(authMiddleware);
+router.use(protect);
+// router.use(bootcampGuard); // Removed for division-wide sessions
 
-router
-  .route("/")
-  .post(authorizeRole("super-admin", "admin"), checkDivisionAccess, createSession)
-  .get(checkDivisionAccess, getSessions);
+router.route("/")
+  .post(checkDivisionAccess, createSession)
+  .get(getSessions);
 
-router
-  .route("/:id")
-  .put(authorizeRole("super-admin", "admin"), checkDivisionAccess, updateSession)
-  .delete(authorizeRole("super-admin", "admin"), checkDivisionAccess, deleteSession);
+router.route("/:id")
+  .get(getSessionById)
+  .patch(restrictTo("super-admin", "admin", "instructor"), updateSession)
+  .delete(restrictTo("super-admin", "admin"), deleteSession);
 
-router
-  .route("/:id/assign-instructor")
-  .patch(authorizeRole("super-admin", "admin"), checkDivisionAccess, assignInstructor);
+router.patch("/:id/assign-instructor", restrictTo("super-admin", "admin"), assignInstructor);
 
-router.get("/:session_id/resources", checkDivisionAccess, getResourcesBySession);
+// New route to get available instructors for a division
+router.get("/available-instructors/:divisionId", restrictTo("super-admin", "admin"), getAvailableInstructors);
 
 export default router;

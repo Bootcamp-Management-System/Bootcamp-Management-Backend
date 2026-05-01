@@ -2,39 +2,37 @@ import mongoose from "mongoose";
 
 const notificationSchema = new mongoose.Schema(
   {
-    recipient: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Recipient ID is required"],
-    },
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      required: true,
     },
     title: {
       type: String,
-      required: [true, "Notification title is required"],
+      required: true,
     },
     message: {
       type: String,
-      required: [true, "Notification message is required"],
+      required: true,
     },
     type: {
       type: String,
-      enum: ["info", "alert", "task", "session", "grading"],
-      default: "info",
-    },
-    link: {
-      type: String,
+      enum: ["SESSION", "ASSIGNMENT", "TASK", "MEMBERSHIP", "ANNOUNCEMENT"],
+      default: "SESSION",
     },
     isRead: {
       type: Boolean,
       default: false,
     },
+    link: {
+      type: String, // Optional link to the specific resource
+    },
+    announcementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Announcement",
+    },
   },
   { timestamps: true }
 );
-
-notificationSchema.index({ recipient: 1, isRead: 1 });
 
 export default mongoose.model("Notification", notificationSchema);
