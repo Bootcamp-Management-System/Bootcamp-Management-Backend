@@ -29,7 +29,12 @@ const resourceSchema = new mongoose.Schema({
   bootcamp_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Bootcamp',
-    required: [true, 'Bootcamp ID is required'],
+    default: null
+  },
+  division_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Division',
+    default: null
   },
   session_id: {
     type: mongoose.Schema.Types.ObjectId,

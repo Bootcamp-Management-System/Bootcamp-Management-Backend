@@ -73,19 +73,22 @@ export const uploadResource = async (req, res) => {
     const hasFile = Boolean(req.file);
     const hasExternalUrl = Boolean(external_url?.trim());
 
-    if (!title || !bootcamp_id) {
+    if (!title) {
       removeUploadedFile(req.file);
-      return res.status(400).json({ message: "Title and bootcamp_id are required fields" });
+      return res.status(400).json({ message: "Title is a required field" });
     }
 
     if (!hasFile && !hasExternalUrl) {
       return res.status(400).json({ message: "Upload a file or provide an external resource link." });
     }
 
-    const bootcamp = await Bootcamp.findById(bootcamp_id);
-    if (!bootcamp) {
-      removeUploadedFile(req.file);
-      return res.status(404).json({ message: "Bootcamp does not exist" });
+    let bootcamp = null;
+    if (bootcamp_id && bootcamp_id !== "undefined" && bootcamp_id !== "null") {
+      bootcamp = await Bootcamp.findById(bootcamp_id);
+      if (!bootcamp) {
+        removeUploadedFile(req.file);
+        return res.status(404).json({ message: "Bootcamp does not exist" });
+      }
     }
 
     let session = null;
@@ -132,7 +135,8 @@ export const uploadResource = async (req, res) => {
       file_url,
       external_url: hasFile ? undefined : external_url.trim(),
       file_type,
-      bootcamp_id,
+      bootcamp_id: bootcamp ? bootcamp._id : null,
+      division_id: bootcamp ? bootcamp.division : (session ? session.division : null),
       session_id: session_id || null,
       uploaded_by: req.user._id,
       uploader_role: req.user.role,

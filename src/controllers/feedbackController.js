@@ -66,14 +66,14 @@ export const getFeedback = async (req, res) => {
     const filter = {};
     const { user } = req;
 
-    if (user.role === 'student') {
+    if (user.role === 'student' || user.role === 'member') {
       filter.student = user.id;
-    } else if (user.role === 'instructor' || user.role === 'student') {
+    } else if (user.role === 'instructor' || user.role === 'student' || user.role === 'member') {
       // Find ALL sessions where this user is the instructor (Contextual Instructor)
       const sessions = await Session.find({ instructor: user.id });
       const sessionIds = sessions.map(s => s._id);
       
-      if (user.role === 'student') {
+      if (user.role === 'student' || user.role === 'member') {
         // Students see their own feedback AND feedback for sessions they instruct
         filter.$or = [
           { student: user.id },

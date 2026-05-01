@@ -12,9 +12,9 @@ router.get("/public", getPublicFeedback);
 router.use(protect);
 router.use(bootcampGuard); // 🔒 Only accepted students + staff
 
-router.post("/", restrictTo("student"), submitFeedback);
-router.get("/", restrictTo("super-admin", "admin", "instructor", "student"), getFeedback);
-router.patch("/:id", restrictTo("student"), updateFeedback);
+router.post("/", restrictTo("student", "member"), submitFeedback);
+router.get("/", restrictTo("super-admin", "admin", "instructor", "student", "member"), getFeedback);
+router.patch("/:id", restrictTo("student", "member"), updateFeedback);
 router.get("/stats/:sessionId", restrictTo("super-admin", "admin", "instructor"), getSessionStats);
 
 export default router;
