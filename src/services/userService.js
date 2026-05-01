@@ -143,7 +143,11 @@ export const createUser = async (userData, creatorUser) => {
   };
 
   export const getUserById = async (id) => {
-    const user = await User.findById(id).select("-password").populate("division", "name");
+    const user = await User.findById(id)
+      .select("-password")
+      .populate("division", "name")
+      .populate("memberships.division", "name")
+      .populate("assignedDivisions", "name");
     if (!user) {
       const err = new Error("User not found");
       err.statusCode = 404;

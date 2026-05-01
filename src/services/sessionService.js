@@ -201,7 +201,23 @@ export const getSessions = async (user, queryData) => {
 
   if (user.role === "student") {
     const activeEnrollments = await Enrollment.find({ student: user._id || user.id, is_active: true }).select("bootcamp");
-    filter.bootcamp = { $in: activeEnrollments.map((enrollment) => enrollment.bootcamp) };
+    const enrolledBootcampIds = activeEnrollments
+      .map((enrollment) => enrollment.bootcamp)
+      .filter(Boolean);
+
+    if (queryData.bootcamp) {
+      const canViewRequestedBootcamp = enrolledBootcampIds.some(
+        (bootcampId) => bootcampId.toString() === queryData.bootcamp.toString()
+      );
+
+      if (!canViewRequestedBootcamp) {
+        return [];
+      }
+
+      filter.bootcamp = queryData.bootcamp;
+    } else {
+      filter.bootcamp = { $in: enrolledBootcampIds };
+    }
   }
 
   if (queryData.division) {

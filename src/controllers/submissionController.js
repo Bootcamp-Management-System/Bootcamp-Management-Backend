@@ -5,8 +5,19 @@ import Enrollment from "../models/Enrollment.js";
 
 const getUserId = (user) => user?._id || user?.id;
 
+const gradeScores = {
+  A: 100,
+  B: 85,
+  C: 70,
+  D: 55,
+};
+
 const getSubmissionPayload = (req) => {
   const {
+    title,
+    submissionTitle,
+    description,
+    submissionDescription,
     contentUrl,
     projectUrl,
     githubUrl,
@@ -27,6 +38,8 @@ const getSubmissionPayload = (req) => {
   const nextContentUrl = contentUrl || projectUrl;
 
   return {
+    title: title || submissionTitle,
+    description: description || submissionDescription,
     contentUrl: nextContentUrl,
     githubUrl: nextGithubUrl,
     driveUrl: nextDriveUrl,
@@ -102,6 +115,8 @@ export const submitTask = async (req, res) => {
     if (submission) {
       submission.versions.push({
         contentUrl: submission.contentUrl,
+        title: submission.title,
+        description: submission.description,
         githubUrl: submission.githubUrl,
         driveUrl: submission.driveUrl,
         fileUrl: submission.fileUrl,
@@ -114,6 +129,7 @@ export const submitTask = async (req, res) => {
         status: "pending",
         feedback: undefined,
         grade: undefined,
+        gradeLetter: undefined,
         reviewedBy: undefined,
         reviewedAt: undefined,
       });
@@ -159,6 +175,8 @@ export const updateSubmission = async (req, res) => {
 
     submission.versions.push({
       contentUrl: submission.contentUrl,
+      title: submission.title,
+      description: submission.description,
       githubUrl: submission.githubUrl,
       driveUrl: submission.driveUrl,
       fileUrl: submission.fileUrl,
@@ -171,6 +189,7 @@ export const updateSubmission = async (req, res) => {
       status: "pending",
       feedback: undefined,
       grade: undefined,
+      gradeLetter: undefined,
       reviewedBy: undefined,
       reviewedAt: undefined,
     });
@@ -185,7 +204,7 @@ export const updateSubmission = async (req, res) => {
 // @desc    Review a submission (Instructor/Admin only)
 export const reviewSubmission = async (req, res) => {
   try {
-    const { status, feedback, grade } = req.body;
+    const { status, feedback, grade, gradeLetter } = req.body;
     const reviewerId = getUserId(req.user);
 
     const submission = await Submission.findById(req.params.id).populate("task");
@@ -217,9 +236,16 @@ export const reviewSubmission = async (req, res) => {
       return res.status(400).json({ error: "Status must be Graded or Returned" });
     }
 
+    if (normalizedStatus === "graded" && gradeLetter && !gradeScores[gradeLetter]) {
+      return res.status(400).json({ error: "Grade must be A, B, C, or D" });
+    }
+
     submission.status = normalizedStatus;
     submission.feedback = feedback;
-    submission.grade = grade;
+    submission.gradeLetter = normalizedStatus === "graded" ? gradeLetter : undefined;
+    submission.grade = normalizedStatus === "graded"
+      ? (gradeLetter ? gradeScores[gradeLetter] : grade)
+      : undefined;
     submission.reviewedBy = reviewerId;
     submission.reviewedAt = new Date();
 
@@ -234,11 +260,15 @@ export const reviewSubmission = async (req, res) => {
 // @desc    Get submissions (Filtered)
 export const getSubmissions = async (req, res) => {
   try {
-    const { taskId, studentId } = req.query;
+    const { taskId, studentId, sessionId } = req.query;
     const filter = {};
 
     if (taskId) filter.task = taskId;
     if (studentId) filter.student = studentId;
+    if (sessionId) {
+      const sessionTasks = await Task.find({ session: sessionId }).select("_id");
+      filter.task = { $in: sessionTasks.map((task) => task._id) };
+    }
 
     // RBAC logic for viewing
     if (req.user.role === 'student') {
@@ -256,7 +286,7 @@ export const getSubmissions = async (req, res) => {
 
     const submissions = await Submission.find(filter)
       .populate("student", "name email")
-      .populate("task", "title maxScore")
+      .populate("task", "title maxScore session")
       .populate("reviewedBy", "email");
 
     res.status(200).json({ success: true, count: submissions.length, data: submissions });

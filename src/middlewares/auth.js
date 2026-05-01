@@ -38,7 +38,8 @@ export const protect = async (req, res, next) => {
     if (viewRole && viewRole !== currentUser.role) {
       if (['super-admin', 'admin', 'instructor'].includes(currentUser.role)) {
         const roleHierarchy = { 'super-admin': 3, 'admin': 2, 'instructor': 1, 'student': 0 };
-        const normalizedViewRole = viewRole === 'super_admin' ? 'super-admin' : viewRole;
+        const normalizedViewRole =
+          viewRole === 'super_admin' ? 'super-admin' : viewRole === 'member' ? 'student' : viewRole;
         
         // Only allow downgrading or lateral movement, never upgrading
         if (roleHierarchy[normalizedViewRole] <= roleHierarchy[currentUser.role]) {

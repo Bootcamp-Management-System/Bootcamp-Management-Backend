@@ -12,6 +12,14 @@ const submissionSchema = new mongoose.Schema(
       ref: "User",
       required: [true, "Student ID is required"],
     },
+    title: {
+      type: String,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
     contentUrl: {
       type: String,
       trim: true,
@@ -53,6 +61,10 @@ const submissionSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    gradeLetter: {
+      type: String,
+      enum: ["A", "B", "C", "D"],
+    },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -67,6 +79,8 @@ const submissionSchema = new mongoose.Schema(
     versions: [
       {
         contentUrl: String,
+        title: String,
+        description: String,
         githubUrl: String,
         driveUrl: String,
         fileUrl: String,

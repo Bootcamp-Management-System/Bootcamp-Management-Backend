@@ -116,7 +116,9 @@ export const resendOtp = async (email) => {
 
 export const loginUser = async (email, password) => {
   const normalizedEmail = email.trim().toLowerCase();
-  const user = await User.findOne({ email: normalizedEmail }).populate('division');
+  const user = await User.findOne({ email: normalizedEmail })
+    .populate('division', 'name')
+    .populate('memberships.division', 'name');
   
   if (!user) {
     throw new Error("Invalid email or password");

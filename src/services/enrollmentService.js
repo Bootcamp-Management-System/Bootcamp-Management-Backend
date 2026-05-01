@@ -26,7 +26,11 @@ export const activateEnrollment = async (studentId, otpCode) => {
 
 export const getMyEnrollments = async (studentId) => {
   return await Enrollment.find({ student: studentId })
-    .populate('bootcamp', 'name startDate endDate bannerImage description bootcampType division')
+    .populate({
+      path: 'bootcamp',
+      select: 'name startDate endDate bannerImage description bootcampType division',
+      populate: { path: 'division', select: 'name' },
+    })
     .sort('-createdAt');
 };
 

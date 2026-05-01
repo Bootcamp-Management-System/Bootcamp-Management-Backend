@@ -12,6 +12,8 @@ const allowStudentAction = (req, res, next) => {
 
   const normalizedViewRole = req.headers["x-view-role"] === "super_admin"
     ? "super-admin"
+    : req.headers["x-view-role"] === "member"
+    ? "student"
     : req.headers["x-view-role"];
   const roleHierarchy = { "super-admin": 3, admin: 2, instructor: 1, student: 0 };
   const canViewAsStudent =

@@ -7,7 +7,6 @@ Instructors/admins can create tasks with:
 - title and detailed description
 - optional project details link, such as Notion or Google Docs
 - deadline with date and time
-- max score
 - session, bootcamp, and division ownership
 
 Tasks created for a bootcamp appear under the student's **My Tasks** area for students actively enrolled in that bootcamp.
@@ -16,6 +15,8 @@ Tasks created for a bootcamp appear under the student's **My Tasks** area for st
 
 Students can submit:
 
+- submission title
+- submission description
 - uploaded file
 - GitHub link
 - Google Drive file or folder link
@@ -40,9 +41,20 @@ Returned submissions can be resubmitted even after the original deadline, so ins
 Instructors/admins review with:
 
 - `status`: `graded` or `returned`
-- `grade`: numeric score
+- `gradeLetter`: `A`, `B`, `C`, or `D`
 - `feedback`: written feedback
 
 Endpoint:
 
 - `PATCH /api/v1/submissions/:id/review`
+
+The backend stores the grade letter and a numeric equivalent for reporting:
+
+- A = 100
+- B = 85
+- C = 70
+- D = 55
+
+Instructors can also review submissions from a session workspace through the **Task Submissions** tab next to Feedback. That view shows student name, task title, submission title/description, Google Drive link, GitHub link, uploaded file, and project link.
+
+Student task pages show session grades by averaging the A-D grade points for graded tasks in that session.

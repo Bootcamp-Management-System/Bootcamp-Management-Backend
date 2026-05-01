@@ -42,3 +42,13 @@ The backend verifies:
 - the user has `isMember: true` for the bootcamp division
 
 The enrollment is created active immediately, without OTP.
+
+## Dashboard Scoping
+
+Student bootcamp dashboards request sessions, tasks, attendance, and feedback for the selected bootcamp only.
+
+The sessions API now keeps the requested `bootcamp` filter for students after verifying the student has an active enrollment in that bootcamp. If the student is not enrolled, the API returns an empty list instead of falling back to every bootcamp the student has joined.
+
+This prevents sessions, attendance, resources, and feedback from one bootcamp appearing under another bootcamp dashboard.
+
+The frontend member portal label is normalized to the backend `student` view role, so instructors or admins using the member/student portal receive the same scoped bootcamp dashboard data.
