@@ -33,6 +33,24 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'Session expired. Please login again.' });
     }
 
+    // --- VIEW PORTAL AS (ROLE SWITCH) SUPPORT ---
+    const viewRole = req.headers['x-view-role'];
+    if (viewRole && viewRole !== currentUser.role) {
+      if (['super-admin', 'admin', 'instructor'].includes(currentUser.role)) {
+        const roleHierarchy = { 'super-admin': 3, 'admin': 2, 'instructor': 1, 'student': 0 };
+        const normalizedViewRole = viewRole === 'super_admin' ? 'super-admin' : viewRole;
+        
+        // Only allow downgrading or lateral movement, never upgrading
+        if (roleHierarchy[normalizedViewRole] <= roleHierarchy[currentUser.role]) {
+          // SAFEGUARD: Only override the role for GET requests to prevent accidental database saves 
+          // (like req.user.save()) from permanently demoting the admin in the database.
+          if (req.method === 'GET') {
+            currentUser.role = normalizedViewRole;
+          }
+        }
+      }
+    }
+
     req.user = currentUser;
     next();
   } catch (error) {
