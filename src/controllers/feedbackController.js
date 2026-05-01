@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import Feedback from "../models/Feedback.js";
 import Session from "../models/Session.js";
+import Enrollment from "../models/Enrollment.js";
+
+const getUserId = (user) => user?._id || user?.id;
 
 const getUserDivisionId = (user) => {
   if (user.division) return user.division.toString();
@@ -29,7 +32,11 @@ const userHasDivisionAccess = (user, targetDivisionId) => {
 export const submitFeedback = async (req, res) => {
   try {
     const { sessionId, rating, comment } = req.body;
-    const studentId = req.user.id;
+    const studentId = getUserId(req.user);
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId is required" });
+    }
 
     // 1. Verify session exists
     const session = await Session.findById(sessionId);
@@ -37,9 +44,18 @@ export const submitFeedback = async (req, res) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
-    // 2. Ensure student is in same division as session
-    if (!userHasDivisionAccess(req.user, session.division)) {
-      return res.status(403).json({ error: "You can only provide feedback for your division's sessions" });
+    if (session.status !== "completed") {
+      return res.status(400).json({ error: "Feedback opens after the instructor ends the session" });
+    }
+
+    const enrollment = await Enrollment.findOne({
+      student: studentId,
+      bootcamp: session.bootcamp,
+      is_active: true,
+    });
+
+    if (!enrollment) {
+      return res.status(403).json({ error: "You can only provide feedback for sessions in your enrolled bootcamps" });
     }
 
     // 3. Create feedback
@@ -65,22 +81,24 @@ export const getFeedback = async (req, res) => {
   try {
     const filter = {};
     const { user } = req;
+    const { session: requestedSession } = req.query;
+    const userId = getUserId(user);
+
+    if (requestedSession) {
+      filter.session = requestedSession;
+    }
 
     if (user.role === 'student' || user.role === 'member') {
-      filter.student = user.id;
-    } else if (user.role === 'instructor' || user.role === 'student' || user.role === 'member') {
-      // Find ALL sessions where this user is the instructor (Contextual Instructor)
-      const sessions = await Session.find({ instructor: user.id });
+      filter.student = userId;
+    } else if (user.role === 'instructor') {
+      const sessions = await Session.find({ instructor: userId }).select("_id");
       const sessionIds = sessions.map(s => s._id);
-      
-      if (user.role === 'student' || user.role === 'member') {
-        // Students see their own feedback AND feedback for sessions they instruct
-        filter.$or = [
-          { student: user.id },
-          { session: { $in: sessionIds } }
-        ];
-      } else {
-        filter.session = { $in: sessionIds };
+      filter.session = requestedSession
+        ? requestedSession
+        : { $in: sessionIds };
+
+      if (requestedSession && !sessionIds.some(id => id.toString() === requestedSession.toString())) {
+        return res.status(403).json({ error: "You can only view feedback for sessions assigned to you" });
       }
     } else if (user.role === 'admin') {
       if (user.division) {
@@ -94,7 +112,8 @@ export const getFeedback = async (req, res) => {
     let feedbacks = await Feedback.find(filter)
       .populate("student", "name email")
       .populate("session", "title instructor")
-      .populate("division", "name");
+      .populate("division", "name")
+      .sort({ createdAt: -1 });
 
     // Anonymize for instructors
     if (user.role === 'instructor') {
@@ -144,7 +163,7 @@ export const getSessionStats = async (req, res) => {
     // Permission Check
     const isSuperAdmin = req.user.role === 'super-admin';
     const isAdminOfDivision = req.user.role === 'admin' && userHasDivisionAccess(req.user, session.division);
-    const isSessionInstructor = session.instructor?.toString() === req.user.id.toString();
+    const isSessionInstructor = session.instructor?.toString() === getUserId(req.user).toString();
 
     if (!isSuperAdmin && !isAdminOfDivision && !isSessionInstructor) {
       return res.status(403).json({ error: "Access denied. Only the instructor or division admin can see feedback stats." });

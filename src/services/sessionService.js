@@ -320,14 +320,15 @@ export const updateSession = async (id, updateData, actor) => {
      notifyInstructor(session).catch(err => console.error("Instructor Notification failed", err));
   }
 
-  // Only send notifications if explicitly requested, to prevent spam
-  const didPublishDetails = updateData.notifyStudents === true;
+  // Send feedback prompt automatically when an instructor ends the session.
+  const didCompleteSession = updateData.status === "completed" && sessionToUpdate.status !== "completed";
+  const didPublishDetails = updateData.notifyStudents === true || didCompleteSession;
 
   if (didPublishDetails) {
     const enrollments = await Enrollment.find({ bootcamp: session.bootcamp, is_active: true }).select("student");
     const title = session.status === "completed" ? `Session ended: ${session.title}` : `Session updated: ${session.title}`;
     const message = session.status === "completed"
-      ? "The instructor ended this session. Please check the session page for follow-up items."
+      ? "The instructor ended this session. Please open the session page and submit your feedback."
       : "The instructor updated the session details, resources, or meeting information.";
 
     await Notification.insertMany(

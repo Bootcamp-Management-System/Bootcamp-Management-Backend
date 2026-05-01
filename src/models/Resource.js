@@ -60,7 +60,7 @@ const resourceSchema = new mongoose.Schema({
   }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
-resourceSchema.pre('validate', function validateResourceTarget(next) {
+resourceSchema.pre('validate', function validateResourceTarget() {
   if (this.resource_type === 'link' && !this.external_url) {
     this.invalidate('external_url', 'External URL is required for link resources');
   }
@@ -68,8 +68,6 @@ resourceSchema.pre('validate', function validateResourceTarget(next) {
   if (this.resource_type === 'file' && !this.file_url) {
     this.invalidate('file_url', 'File URL is required for uploaded resources');
   }
-
-  next();
 });
 
 export default mongoose.model('Resource', resourceSchema);
