@@ -5,6 +5,12 @@ import Enrollment from "../models/Enrollment.js";
 import Bootcamp from "../models/Bootcamp.js";
 import EmailService from "./emailService.js";
 
+const sendRecruitmentEmail = (sendEmail, context) => {
+  Promise.resolve()
+    .then(sendEmail)
+    .catch((error) => console.error(`Recruitment email failed (${context}):`, error.message));
+};
+
 // ─── ADMIN: Template Management ──────────────────────────────────────────────
 
 export const createOrUpdateTemplateRepo = async (bootcampId, templateData, adminId) => {
@@ -122,23 +128,32 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
     if (app.status !== 'PENDING') throw new Error("Only PENDING apps can be passed to the next round.");
     nextStatus = 'SCREENED_ROUND_1';
     app.phase2Submission.taskLinkSent = true;
-    await EmailService.sendPhase2TaskEmail(student.email, app.bootcampApplied, app._id);
+    sendRecruitmentEmail(
+      () => EmailService.sendPhase2TaskEmail(student.email, app.bootcampApplied, app._id),
+      "phase 2 task"
+    );
   }
 
   else if (decision === 'REJECT') {
     nextStatus = 'REJECTED';
-    await EmailService.sendRejectionEmail(student.email);
+    sendRecruitmentEmail(
+      () => EmailService.sendRejectionEmail(student.email),
+      "rejection"
+    );
   }
 
   else if (decision === 'WAIT') {
     if (app.status !== 'TASK_EVALUATION') throw new Error("WAIT status is only for technical task evaluation phase.");
     nextStatus = 'WAITLISTED';
-    await EmailService.sendWaitlistEmail(student.email);
+    sendRecruitmentEmail(
+      () => EmailService.sendWaitlistEmail(student.email),
+      "waitlist"
+    );
   }
 
   else if (decision === 'ACCEPT') {
-    if (!['PENDING', 'TASK_EVALUATION', 'WAITLIST_TASK_EVALUATION'].includes(app.status)) {
-        throw new Error("Students can only be ACCEPTED from Pending or Evaluation stages.");
+    if (!['PENDING', 'TASK_EVALUATION', 'WAITLIST_TASK_EVALUATION', 'WAITLISTED'].includes(app.status)) {
+        throw new Error("Students can only be ACCEPTED from Pending, Evaluation, or Waitlist stages.");
     }
     nextStatus = 'ACCEPTED';
 
@@ -157,7 +172,10 @@ export const handleAdminDecisionRepo = async (applicationId, adminId, decisionPa
       await existingEnrollment.save();
     }
 
-    await EmailService.sendAcceptanceEmail(student.email, otp, app.bootcampApplied);
+    sendRecruitmentEmail(
+      () => EmailService.sendAcceptanceEmail(student.email, otp, app.bootcampApplied),
+      "acceptance"
+    );
 
   }
 
