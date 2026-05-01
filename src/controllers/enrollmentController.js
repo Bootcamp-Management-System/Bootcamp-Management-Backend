@@ -32,3 +32,15 @@ export const getBootcampEnrollments = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const enrollInternalBootcamp = async (req, res) => {
+  try {
+    const { bootcampId } = req.body;
+    if (!bootcampId) return res.status(400).json({ error: "bootcampId is required" });
+
+    const result = await enrollmentService.enrollInternalBootcamp(req.user.id || req.user._id, bootcampId, req.user);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};

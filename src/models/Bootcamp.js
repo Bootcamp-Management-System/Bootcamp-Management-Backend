@@ -14,6 +14,11 @@ const bootcampSchema = new mongoose.Schema({
   description: { 
     type: String 
   },
+  bootcampType: {
+    type: String,
+    enum: ['external', 'internal'],
+    default: 'external'
+  },
   startDate: { 
     type: Date 
   },

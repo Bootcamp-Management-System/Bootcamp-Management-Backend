@@ -84,3 +84,12 @@ export const getAvailableBootcamps = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const getInternalBootcamps = async (req, res) => {
+  try {
+    const bootcamps = await bootcampService.getInternalBootcampsForMember(req.user, req.query.division);
+    res.status(200).json({ success: true, count: bootcamps.length, data: bootcamps });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

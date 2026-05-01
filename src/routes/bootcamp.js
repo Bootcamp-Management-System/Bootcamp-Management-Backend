@@ -6,7 +6,8 @@ import {
   updateBootcamp, 
   deleteBootcamp,
   getPublicBootcamps,
-  getAvailableBootcamps
+  getAvailableBootcamps,
+  getInternalBootcamps
 } from "../controllers/bootcampController.js";
 import { authMiddleware } from "../middlewares/auth.js";
 import { restrictTo } from "../middlewares/roleValidator.js";
@@ -20,6 +21,8 @@ router.get("/available", getAvailableBootcamps);
 
 // Protected Routes
 router.use(authMiddleware);
+
+router.get("/internal/member", getInternalBootcamps);
 
 router
   .route("/")

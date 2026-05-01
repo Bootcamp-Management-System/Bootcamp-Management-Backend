@@ -69,6 +69,11 @@ export const unpublishTemplate = async (req, res) => {
 export const getTemplate = async (req, res) => {
   try {
     const { bootcampId } = req.params;
+    const bootcamp = await Bootcamp.findById(bootcampId).select("bootcampType");
+    if (bootcamp?.bootcampType === "internal" && applicantRoles.includes(req.user.role)) {
+      return res.status(404).json({ error: "Applications are not available for this internal bootcamp" });
+    }
+
     const template = await getTemplateByBootcampRepo(bootcampId);
     if (!template) {
       if (req.user.role === 'super-admin' || req.user.role === 'super_admin' || req.user.role === 'admin') {

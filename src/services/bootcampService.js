@@ -29,7 +29,7 @@ export const deleteBootcamp = async (id) => {
 
 // Public method for Landing Page
 export const getPublishedBootcamps = async () => {
-  return await Bootcamp.find({ isPublished: true }).populate('division', 'name description');
+  return await Bootcamp.find({ isPublished: true, bootcampType: { $ne: 'internal' } }).populate('division', 'name description');
 };
 
 export const getAvailableBootcamps = async () => {
@@ -39,7 +39,28 @@ export const getAvailableBootcamps = async () => {
   return await Bootcamp.find({
     _id: { $in: bootcampIds },
     isPublished: true,
+    bootcampType: { $ne: 'internal' },
   })
     .populate("division", "name description")
     .sort("-createdAt");
+};
+
+export const getInternalBootcampsForMember = async (user, divisionId) => {
+  const memberDivisionIds = (user.memberships || [])
+    .filter((membership) => membership.isMember)
+    .map((membership) => membership.division?.toString());
+
+  const targetDivisions = divisionId
+    ? memberDivisionIds.filter((id) => id === divisionId.toString())
+    : memberDivisionIds;
+
+  if (targetDivisions.length === 0) return [];
+
+  return await Bootcamp.find({
+    bootcampType: 'internal',
+    isPublished: true,
+    division: { $in: targetDivisions },
+  })
+    .populate('division', 'name description')
+    .sort('-createdAt');
 };

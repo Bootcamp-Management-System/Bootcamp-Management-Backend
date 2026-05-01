@@ -68,6 +68,9 @@ export const applyToBootcampRepo = async (studentId, bootcampId, phase1Answers) 
 
   const bootcamp = await Bootcamp.findById(bootcampId);
   if (!bootcamp) throw new Error("Bootcamp not found");
+  if (bootcamp.bootcampType === 'internal') {
+    throw new Error("Internal bootcamps are only available through the member hub.");
+  }
 
   return await Application.create({
     student: studentId,
