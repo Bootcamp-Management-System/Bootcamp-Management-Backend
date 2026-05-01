@@ -4,8 +4,8 @@ import Enrollment from "../models/Enrollment.js";
 import Notification from "../models/Notification.js";
 
 export const createTask = async (taskData, creator) => {
-  const { title, description, startTime, endTime, deadline, session } = taskData;
-  let { bootcamp } = taskData;
+  const { title, description, projectLink, maxScore, submissionTypes, session } = taskData;
+  let { bootcamp, division, startTime, endTime, deadline } = taskData;
 
   if (session) {
     const sessionData = await Session.findById(session);
@@ -18,6 +18,10 @@ export const createTask = async (taskData, creator) => {
     // Infer bootcamp if missing
     if (!bootcamp && sessionData.bootcamp) {
       bootcamp = sessionData.bootcamp;
+    }
+
+    if (!division && sessionData.division) {
+      division = sessionData.division;
     }
     
     // Contextual Permission Check
@@ -44,13 +48,36 @@ export const createTask = async (taskData, creator) => {
     throw err;
   }
 
+  if (!division && creator.division) {
+    division = creator.division;
+  }
+
+  if (!division) {
+    const err = new Error("Task must belong to a division.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!deadline) {
+    const err = new Error("Deadline is required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  startTime = startTime || new Date();
+  endTime = endTime || deadline;
+
   const task = await Task.create({
     title,
     description,
+    projectLink,
+    maxScore,
+    submissionTypes,
     startTime,
     endTime,
     deadline,
     bootcamp,
+    division,
     session,
     createdBy: creator._id || creator.id
   });
@@ -82,6 +109,10 @@ export const getTasks = async (user, queryData) => {
     filter.session = queryData.session;
   }
 
+  if (queryData.division) {
+    filter.division = queryData.division;
+  }
+
   if (user.role === 'student') {
     const activeEnrollments = await Enrollment.find({ student: user._id || user.id, is_active: true });
     const enrolledBootcampIds = activeEnrollments.map(e => e.bootcamp);
@@ -97,6 +128,7 @@ export const getTasks = async (user, queryData) => {
 
   const tasks = await Task.find(filter)
     .populate("bootcamp", "name")
+    .populate("division", "name")
     .populate("session", "title")
     .populate("createdBy", "email role");
 
@@ -106,6 +138,7 @@ export const getTasks = async (user, queryData) => {
 export const getTaskById = async (id) => {
   const task = await Task.findById(id)
     .populate("bootcamp", "name")
+    .populate("division", "name")
     .populate("session", "title")
     .populate("createdBy", "email role");
     
