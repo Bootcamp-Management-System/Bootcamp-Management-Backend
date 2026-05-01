@@ -91,10 +91,19 @@ export const getFeedback = async (req, res) => {
     }
     // Super-admin sees everything (filter stays empty)
 
-    const feedbacks = await Feedback.find(filter)
-      .populate("student", "email")
+    let feedbacks = await Feedback.find(filter)
+      .populate("student", "name email")
       .populate("session", "title instructor")
       .populate("division", "name");
+
+    // Anonymize for instructors
+    if (user.role === 'instructor') {
+      feedbacks = feedbacks.map(f => {
+        const obj = f.toObject();
+        delete obj.student;
+        return obj;
+      });
+    }
 
     res.status(200).json({ success: true, count: feedbacks.length, data: feedbacks });
   } catch (error) {

@@ -20,8 +20,8 @@ export const bootcampGuard = async (req, res, next) => {
       return next();
     }
 
-    // 4. For Students
-    if (user.role === 'student') {
+    // 4. For Students (role can be 'student' or 'member')
+    if (user.role === 'student' || user.role === 'member') {
       const enrollment = await Enrollment.findOne({
         student: user.id,
         bootcamp: bootcampId,

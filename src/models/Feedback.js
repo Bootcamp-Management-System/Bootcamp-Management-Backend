@@ -20,7 +20,6 @@ const feedbackSchema = new mongoose.Schema(
     },
     comment: {
       type: String,
-      required: [true, "Feedback comment is required"],
       trim: true,
     },
     division: {

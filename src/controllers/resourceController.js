@@ -51,7 +51,7 @@ const ensureResourceAccess = async (resource, user) => {
     }
   }
 
-  if (user.role === "student") {
+  if (user.role === "student" || user.role === "member") {
     const enrollment = await Enrollment.findOne({
       student: user._id || user.id,
       bootcamp: resource.bootcamp_id,
@@ -170,7 +170,7 @@ export const getResources = async (req, res) => {
       } else {
         query = { visibility: "public" };
       }
-    } else if (userRole === "student") {
+    } else if (userRole === "student" || userRole === "member") {
       const enrollments = await Enrollment.find({ student: req.user._id || req.user.id, is_active: true }).select("bootcamp");
       query = {
         $or: [
@@ -320,7 +320,7 @@ export const getResourcesBySession = async (req, res) => {
     const sessionExists = await Session.findById(session_id);
     if (!sessionExists) return res.status(404).json({ message: "Session not found" });
 
-    if (userRole === "student") {
+    if (userRole === "student" || userRole === "member") {
       const enrollment = await Enrollment.findOne({
         student: req.user._id || req.user.id,
         bootcamp: sessionExists.bootcamp,

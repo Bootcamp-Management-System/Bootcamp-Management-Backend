@@ -23,7 +23,11 @@ const notifyStudents = async (session) => {
       link: `/sessions/${session._id}`
     });
 
-    // 2. Email + Calendar
+    // 2. Email + Calendar (Skip email if student is the assigned instructor)
+    if (session.instructor && student._id.toString() === session.instructor.toString()) {
+      return;
+    }
+    
     await EmailService.sendSessionNotification(student.email, session);
   });
 
@@ -263,7 +267,7 @@ export const updateSession = async (id, updateData, actor) => {
   }
 
   if (actor?.role === "instructor") {
-    const allowedInstructorFields = ["description", "location", "meetingLink", "status", "completedAt"];
+    const allowedInstructorFields = ["description", "location", "meetingLink", "status", "completedAt", "notifyStudents"];
     updateData = Object.fromEntries(
       Object.entries(updateData).filter(([key]) => allowedInstructorFields.includes(key))
     );
@@ -316,9 +320,8 @@ export const updateSession = async (id, updateData, actor) => {
      notifyInstructor(session).catch(err => console.error("Instructor Notification failed", err));
   }
 
-  const didPublishDetails = ["description", "location", "meetingLink", "status"].some(
-    (field) => Object.prototype.hasOwnProperty.call(updateData, field)
-  );
+  // Only send notifications if explicitly requested, to prevent spam
+  const didPublishDetails = updateData.notifyStudents === true;
 
   if (didPublishDetails) {
     const enrollments = await Enrollment.find({ bootcamp: session.bootcamp, is_active: true }).select("student");
